@@ -8,6 +8,7 @@ let user0, user1, user2, nonUser1, nonUser2,nonUser3, voter1, voter2, voter3, da
 let diplomaFile, rda;
 let timestamp;
 let price, priceHT, fees, bonus;
+//Test pour changer quelque chose 
 
 /* ************************************************************************ Fixture ************************************************************************ */
 
