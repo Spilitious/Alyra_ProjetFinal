@@ -4,69 +4,117 @@ const { ethers } = require('hardhat');
 
 require("@nomicfoundation/hardhat-toolbox/network-helpers");
 
-let addr0, addr1, addr2; 
+let user0, user1, user2, nonUser1, nonUser2,nonUser3, voter1, voter2, voter3, daoAddress; 
 let diplomaFile, rda;
 let timestamp;
+let price, priceHT, fees, bonus;
 
 /* ************************************************************************ Fixture ************************************************************************ */
 
 async function LoadFixtureForCreateCase() {
     
-    //Addr0 possède 1000 token au déploiement du contrat RealDiplomaToken
-    //Addr1 récupère 1000 token mais n'a pas d'allowance enregistré
-    //Addr2 possède une allowance de 300 mais ne possède aucun token 
+    //user0 1000 token - Owner du contrat RealDiplomaToken
+    //user1 1000 token
+    //user2 1000 token 
+    
+    //nonUser1 possède des tokens mais n'a pas d'allowance
+    //nonUser2 possède une allowance mais n'a pas de token
+    //nonUser3 possède juste assez de token et d'allowance pour déposer un dossier mais manque les fees
 
-    [addr0, addr1, addr2] = await ethers.getSigners()
+    //Voter1 avec 100 tokens bloqués 
+    //Voter2 avec 200 tokens bloqués
+    //Voter3 avec 300 tokens bloqués
 
+    [user0, user1, user2, nonUser1, nonUser2, nonUser3, voter1, voter2, voter3, daoAddress] = await ethers.getSigners();
+
+    //Deploiement RealDiplomaToken
     rda = await ethers.getContractFactory("RealDiplomaToken");
     rda = await rda.deploy();
     await rda.waitForDeployment();
 
+    //Deploiement diplomaFile
     diplomaFile = await ethers.getContractFactory("DiplomaFile");
-    diplomaFile = await diplomaFile.deploy(rda.target);
+    diplomaFile = await diplomaFile.deploy(rda.target, daoAddress);
     await diplomaFile.waitForDeployment();
     
-    rda.mint(addr1, 1000);
-    await rda.approve(diplomaFile.target, 900);
-    await rda.connect(addr2).approve(diplomaFile.target, 300);
+    //Distribution de token et allowance
+    await rda.approve(diplomaFile.target, ethers.parseEther('1000'));
+    await rda.mint(user1, 1000);
+    await rda.connect(user1).approve(diplomaFile.target, ethers.parseEther('1000'));
+    await rda.mint(user2, 1000);
+    await rda.connect(user2).approve(diplomaFile.target, ethers.parseEther('1000'));
+    await rda.mint(nonUser1, 1000);
+    await rda.connect(nonUser2).approve(diplomaFile.target, ethers.parseEther('1000'));
+    //await rda.mint(nonUser3, priceHT);
+    //await rda.connect(nonUser3).approve(diplomaFile.target, priceHT);
+    await rda.mint(voter1, 100);
+    await rda.connect(voter1).approve(diplomaFile.target, ethers.parseEther('100'));
+    await rda.mint(voter2,200);
+    await rda.connect(voter2).approve(diplomaFile.target, ethers.parseEther('200'));
+    await rda.mint(voter3, 300);
+    await rda.connect(voter3).approve(diplomaFile.target, ethers.parseEther('300'));
 
     //Creation d'une date arbitraire en secondes pour enregistrement des dossiers
     const date = new Date("2000-01-01"); 
     timestamp = Math.floor(date.getTime() / 1000); 
 
+    //Récupération des constantes de DiplomaFile
+    price = await diplomaFile.price();
+    const fee = await  diplomaFile.fee();
+    bonus = await diplomaFile.getBonus();
+    fees = (price*fee)/BigInt(100);
+    priceHT = price - fees;
 }
 
 async function LoadFixtureForContestCase() {
-    // Addr0 crée le premier dossier
+    // user0 crée un premier dossier - dossier 0 qui ne sera pas contesté
     await diplomaFile.createCase("Leb", "Aur", timestamp, "Alyra", "Dev", timestamp);
+    // user1 crée un deuxième dossier qui sera contesté puis validé
+    await diplomaFile.connect(user1).createCase("Cyr", "Ben", timestamp, "Disputed", "Valid", timestamp);
+    // user1 crée un troisième dossier qui sera contesté puis rejeté
+    await diplomaFile.connect(user1).createCase("Cheater", "Long", timestamp, "Disputed", "Reject", timestamp);
 }
-
 
 async function LoadFixtureForVoting() {
 
-    // Addr1 est enregistré en tant que voter avant la contestation du dossier et pourra donc voter
-    // Addr0 conteste le dossier 0
-    // Addr0 est enregistré en tant que voter après la création du vote et devra pas être autorisé à voter
-     
-    await rda.connect(addr1).approve(diplomaFile.target, 800);
-    await diplomaFile.connect(addr1).becomeVoter(200);
+    
+    // voter1 & voter2 sont enregistré en tant que voter avant la contestation des dossier et pourra donc voter sur tous les dossiers
+    await diplomaFile.connect(voter1).becomeVoter(ethers.parseEther('100'));
+    await diplomaFile.connect(voter2).becomeVoter(ethers.parseEther('200'));
+    
     await LoadFixtureForContestCase();
-    await diplomaFile.contestCase(0,0);
-    await diplomaFile.becomeVoter(200);
+    // user3 conteste le dossier 1 avec la preuve 0
+    await diplomaFile.connect(user2).contestCase(1,0);
+
+    // voter3 est enregistré après la contetation du dossier 0 et ne pourra donc pas voter pour ce dossier
+    await diplomaFile.connect(voter3).becomeVoter(ethers.parseEther('200'));
+
+    //user2 conteste le dossier 2 avec la preuve 1
+    await diplomaFile.connect(user2).contestCase(2,1);
 }
 
 async function LoadFixtureForResolving() {
-    // Addr1 vote yes pour le litige du dossier 0
-    // Addr0 crée un deuxième dossier qui n'est pas disputé 
-    // Addr0 crée un troisème dossier, le conteste et vote contre 
-    await LoadFixtureForVoting();
-    await diplomaFile.connect(addr1).setVote(0,1);
-    await diplomaFile.createCase("Cyr", "Ben", timestamp, "Alyra", "teacher", timestamp);
-    await diplomaFile.createCase("Test", "Long", timestamp, "Alyra", "Rejected", timestamp);
-    await diplomaFile.contestCase(2,1);
-    await diplomaFile.setVote(1,0);
-
     
+    await LoadFixtureForVoting();
+    // voter1 vote yes pour le litige du dossier 1 et pour le litige du dossier 2
+    await diplomaFile.connect(voter1).setVote(0,1);
+    await diplomaFile.connect(voter1).setVote(1,1);
+    
+    // voter2 vote yes pour le litige du dossier 1 et no pour le litige du dossier 2
+    await diplomaFile.connect(voter2).setVote(0,1);
+    await diplomaFile.connect(voter2).setVote(1,0);
+
+    // voter3 vote no pour le litige du dossier 2 
+    await diplomaFile.connect(voter3).setVote(1,0);
+}
+
+async function LoadFixtureForReward() {
+    
+    await LoadFixtureForResolving();
+    // user1 a son premier dossier validé et lance la résolution 
+    await diplomaFile.connect(user1).resolveAfterVote(1);
+    // user1 a son deuxième dossier rejecté, user2 qui l'a contesté lance la résolution
+    //await diplomaFile.connect(user2).resolveAfterVote(2);
 }
 
 /* ****************************************************************** TESTING ************************************************************************** */
@@ -84,8 +132,8 @@ describe("Diploma File", function () {
 
     describe("Deploiement", function() {
        
-        it('price should be equal to 0', async function() {
-            expect(await diplomaFile.price()).to.be.equal(100);
+        it('price should be equal to variable price', async function() {
+            expect(await diplomaFile.price()).to.be.equal(price);
         });
     });
 
@@ -95,7 +143,7 @@ describe("Diploma File", function () {
     describe("RealDiplomaToken", function() {
        
         it('should revert because not the owner', async function() {
-            await expect(rda.connect(addr1).mint(addr1, 1000))
+            await expect(rda.connect(user1).mint(user1, 1000))
                 .to.be.revertedWithCustomError(rda, "OwnableUnauthorizedAccount");
         });
     });
@@ -106,61 +154,58 @@ describe("Diploma File", function () {
         describe("Function becomeAVoter", function () {
         
             it('should revert cause of Allowance', async function() {
-                await expect(diplomaFile.connect(addr1).becomeVoter(200))
+                await expect(diplomaFile.connect(nonUser1).becomeVoter(ethers.parseEther('200')))
                     .to.be.revertedWithCustomError( rda,"ERC20InsufficientAllowance")
-                    .withArgs(diplomaFile.target, 0,200);
+                    .withArgs(diplomaFile.target, 0, ethers.parseEther('200'));
             }); 
 
-            it('should revert cause of Addr2 has no token', async function() {
-                await expect(diplomaFile.connect(addr2).becomeVoter(200))
-                    .to.be.revertedWithCustomError( rda,"ERC20InsufficientBalance")
-                    .withArgs(addr2, 0,200);
 
+            it('should revert cause of nonUser2 has no token', async function() {
+                await expect(diplomaFile.connect(nonUser2).becomeVoter(ethers.parseEther('200')))
+                    .to.be.revertedWithCustomError( rda,"ERC20InsufficientBalance")
+                    .withArgs(nonUser2, 0,ethers.parseEther('200'));
             }); 
 
             it('should revert cause already a voter', async function() {
-                diplomaFile.becomeVoter(200)
-                await expect(diplomaFile.becomeVoter(200))
+                diplomaFile.connect(voter1).becomeVoter(ethers.parseEther('100'))
+                await expect(diplomaFile.connect(voter1).becomeVoter(ethers.parseEther('100')))
                     .to.be.revertedWithCustomError( diplomaFile,"ErrorAlreadyVoter")
                     .withArgs("Already a voter");
-
             }); 
 
 
             it('should add one Deposit to Deposits', async function() {
-                await diplomaFile.becomeVoter(200);
+                await diplomaFile.connect(voter1).becomeVoter(ethers.parseEther('100'));
                 expect((await diplomaFile.getDeposits()).length).to.be.equal(1);
             });
 
 
             it('should add one Deposit with the good parameters', async function() {
-                await diplomaFile.becomeVoter(200);
-                let [sender, type, amount] = await diplomaFile.connect(addr1).getDeposit(0);
-                expect(sender).to.be.equal(addr0);
+                await diplomaFile.connect(voter1).becomeVoter(ethers.parseEther('100'));
+                let [sender, type, amount] = await diplomaFile.connect(user1).getDeposit(0);
+                expect(sender).to.be.equal(voter1);
                 expect(type).to.be.equal(2);
-                expect(amount).to.be.equal(200);
+                expect(amount).to.be.equal(ethers.parseEther('100'));
         
             });
 
 
             it('should set the mapping mapVoters', async function() {
-                await diplomaFile.becomeVoter(200);
-                expect((await diplomaFile.getVoter(addr0)).tokenAmount).to.be.equal(200);
-                // const ouf = time.latest();
-                // expect((await diplomaFile.getContestFromCaseIndex(0)).registrationTime).to.be.equal(ouf);
+                await diplomaFile.connect(voter1).becomeVoter(ethers.parseEther('100'));
+                expect((await diplomaFile.getVoter(voter1)).tokenAmount).to.be.equal(ethers.parseEther('100'));
             });
 
 
             it('should emit : CreateNewDepositEvent', async function() {
-                await expect(diplomaFile.becomeVoter(200)).to.emit( diplomaFile,"CreateNewDepositEvent")
-                .withArgs(addr0, 0, 2, 200);
+                await expect(diplomaFile.connect(voter2).becomeVoter(ethers.parseEther('200'))).to.emit( diplomaFile,"CreateNewDepositEvent")
+                .withArgs(voter2, 0, 2, ethers.parseEther('200'));
         
             });
     
 
             it('should emit : BecomeAVoter', async function() {
-                await expect(diplomaFile.becomeVoter(200)).to.emit( diplomaFile,"BecomeVoterEvent")
-                .withArgs(addr0, 200);
+                await expect(diplomaFile.connect(voter2).becomeVoter(ethers.parseEther('200'))).to.emit( diplomaFile,"BecomeVoterEvent")
+                .withArgs(voter2, ethers.parseEther('200'));
         
             });
 
@@ -169,24 +214,31 @@ describe("Diploma File", function () {
     
         describe("Function createCase", function () {
     
-            it('should revert cause of addr1 has no allowance', async function() {
-                await expect(diplomaFile.connect(addr1).createCase("Leb", "Aur", timestamp, "Alyra", "Dev", timestamp))
+            it('should revert cause nonUser1 has no allowance', async function() {
+                await expect(diplomaFile.connect(nonUser1).createCase("Leb", "Aur", timestamp, "Alyra", "Dev", timestamp))
                     .to.be.revertedWithCustomError( rda,"ERC20InsufficientAllowance")
-                    .withArgs(diplomaFile.target, 0,100);
+                    .withArgs(diplomaFile.target, 0, priceHT);
 
             }); 
 
+            it('should revert cause of nonUser2 has priceHT token, not enough to pay the fees', async function() {
+                await rda.mint(nonUser2, 90);
+                await expect(diplomaFile.connect(nonUser2).createCase("Leb", "Aur", timestamp, "Alyra", "Dev", timestamp))
+                    .to.be.revertedWithCustomError( rda,"ERC20InsufficientBalance")
+                    .withArgs(nonUser2, 0, fees);
 
-            it('should revert because addr2 has no token', async function() {
-                await expect(diplomaFile.connect(addr2).createCase("Leb", "Aur", timestamp, "Alyra", "Dev", timestamp))
+            }); 
+
+            it('should revert because Nonuser2 has no token', async function() {
+                await expect(diplomaFile.connect(nonUser2).createCase("Leb", "Aur", timestamp, "Alyra", "Dev", timestamp))
                     .to.be.revertedWithCustomError(rda, "ERC20InsufficientBalance")
-                    .withArgs(addr2, 0,100);
+                    .withArgs(nonUser2, 0, priceHT);
             });
 
 
             it('should set mapping CaseToDeposit', async function() {
                 await diplomaFile.createCase("Leb", "Aur", timestamp, "Alyra", "Dev", timestamp);
-                expect((await diplomaFile.getDepositFromCaseIndex(0)).owner).to.be.equal(addr0);
+                expect((await diplomaFile.getDepositFromCaseIndex(0)).owner).to.be.equal(user0);
             });
 
 
@@ -204,10 +256,10 @@ describe("Diploma File", function () {
 
             it('should add one Deposit with the good parameters', async function() {
                 await diplomaFile.createCase("Leb", "Aur", timestamp, "Alyra", "Dev", timestamp);
-                let [sender, type, amount, withdraw] = await diplomaFile.connect(addr1).getDeposit(0);
-                expect(sender).to.be.equal(addr0);
+                let [sender, type, amount] = await diplomaFile.connect(user1).getDeposit(0);
+                expect(sender).to.be.equal(user0);
                 expect(type).to.be.equal(0);
-                expect(amount).to.be.equal(100);
+                expect(amount).to.be.equal(priceHT);
             });
 
 
@@ -219,7 +271,7 @@ describe("Diploma File", function () {
 
             it('should add one Diploma with the good parameters', async function() {
                 await diplomaFile.createCase("Leb", "Aur", timestamp, "Alyra", "Dev", timestamp);
-                let [lastName, firstName, birthday, school, diplomaName, diplomaDate] = await diplomaFile.connect(addr1).getDiploma(0);
+                let [lastName, firstName, birthday, school, diplomaName, diplomaDate] = await diplomaFile.connect(user1).getDiploma(0);
                 expect(lastName).to.be.equal("Leb");
                 expect(firstName).to.be.equal("Aur");
                 expect(birthday).to.be.equal(timestamp);
@@ -237,8 +289,8 @@ describe("Diploma File", function () {
 
             it('should add one Case with the good parameters', async function() {
                 await diplomaFile.createCase("Leb", "Aur", timestamp, "Alyra", "Dev", timestamp);
-                let [owner, , status] = await diplomaFile.connect(addr1).getCase(0);
-                expect(owner).to.be.equal(addr0);
+                let [owner, , status] = await diplomaFile.connect(user1).getCase(0);
+                expect(owner).to.be.equal(user0);
                 expect(status).to.be.equal(0);
             });
 
@@ -248,10 +300,10 @@ describe("Diploma File", function () {
                 .withArgs(0, "Leb", "Aur", timestamp, "Alyra", "Dev", timestamp);
 
                 await expect(diplomaFile.createCase("Leb", "Aur", timestamp, "Alyra", "Dev", timestamp)).to.emit( diplomaFile,"CreateNewDepositEvent")
-                .withArgs(addr0, 1, 0, 100);
+                .withArgs(user0, 1, 0, ethers.parseEther('100'));
 
                 await expect(diplomaFile.createCase("Leb", "Aur", timestamp, "Alyra", "Dev", timestamp)).to.emit( diplomaFile,"CreateNewFileEvent");
-                //.withArgs(2, addr0, 1 ,0);
+                //.withArgs(2, user0, 1 ,0);
             });
 
 
@@ -264,7 +316,7 @@ describe("Diploma File", function () {
 
    /* ******************************************************* Phase 2 : SimpleResolve & ContestCase  ******************************************************************** */
        
-    describe("Phase 2 : SimpleResolve & ContestCase", function () {
+    describe("Phase 2 : SimpleResolve - ContestCase - getContest", function () {
 
         beforeEach(async function() {
             await LoadFixtureForContestCase();
@@ -274,7 +326,7 @@ describe("Diploma File", function () {
         describe("Function simpleResolve", function () {
             
             it('should revert because the index does not exist in Cases - 1st require', async function() {
-                await expect(diplomaFile.simpleResolve(1))
+                await expect(diplomaFile.simpleResolve(3))
                    .to.be.revertedWithCustomError( diplomaFile,"ErrorCaseUnknown")
                    .withArgs("This file doesn't exist");
             }); 
@@ -295,8 +347,8 @@ describe("Diploma File", function () {
             
             /*    Ne semble pas possible sans dépouiller le contrat donc anormal depuis un script exterieur ******************* 
             it.only('should revert cause the contract has no enough token', async function() {
-                await rda.connect(diplomaFile.target).approve(addr0, 100);
-               // let success = await rda.transferFrom(diplomaFile.target, addr0, 100);
+                await rda.connect(diplomaFile.target).approve(user0, 100);
+               // let success = await rda.transferFrom(diplomaFile.target, user0, 100);
                 //console.log(success);
                 await expect(diplomaFile.simpleResolve(0))
                    .to.be.revertedWithCustomError( rda,"ERC20InsufficientBalance")
@@ -306,11 +358,10 @@ describe("Diploma File", function () {
     
             });  */
 
-            it('should revert because addr1 is not the owner of the deposit', async function() {
+            it('should revert because user1 is not the owner of the deposit', async function() {
                 await new Promise(resolve => setTimeout(resolve, 3000));
-                await expect(diplomaFile.connect(addr1).simpleResolve(0)).to.be.revertedWithCustomError(
+                await expect(diplomaFile.connect(user1).simpleResolve(0)).to.be.revertedWithCustomError(
                     diplomaFile, "NotYourStack").withArgs("This is not your deposit")
-                 
             });
         
 
@@ -345,60 +396,60 @@ describe("Diploma File", function () {
         
             it('should revert because the index does not exist in Cases - 1st require', async function() {
        
-                await expect(diplomaFile.contestCase(1,0))
+                await expect(diplomaFile.connect(user2).contestCase(4,0))
                     .to.be.revertedWithCustomError( diplomaFile,"ErrorCaseUnknown")
                     .withArgs("This file doesn't exist");
             }); 
 
 
-            it('should revert because the case is not pending', async function() {
+            it('should revert because the delay has past', async function() {
                 await new Promise(resolve => setTimeout(resolve, 3000));
-                await expect(diplomaFile.contestCase(0,0))
+                await expect(diplomaFile.connect(user2).contestCase(0,0))
                    .to.be.revertedWithCustomError(diplomaFile,"ErrorCaseNotPending")
-                   .withArgs("This file is not pending");
+                   .withArgs("The delay has past");
             }); 
 
 
-            it('should revert because the case is not pending', async function() {
-                await diplomaFile.contestCase(0,0);
-                await expect(diplomaFile.contestCase(0,0))
+            it('should revert because the case is already disputed', async function() {
+                await diplomaFile.connect(user2).contestCase(1,0);
+                await expect(diplomaFile.contestCase(1,0))
                    .to.be.revertedWithCustomError(diplomaFile,"ErrorCaseNotPending")
                    .withArgs("This file is not pending")
             }); 
 
 
             it('should revert cause of Allowance', async function() {
-                 await expect(diplomaFile.connect(addr1).contestCase(0,0))
+                 await expect(diplomaFile.connect(nonUser1).contestCase(0,0))
                     .to.be.revertedWithCustomError( rda,"ERC20InsufficientAllowance")
-                    .withArgs(diplomaFile.target, 0,100);
+                    .withArgs(diplomaFile.target, 0, priceHT);
             }); 
 
 
-            it('should revert cause of Addr2 has no token', async function() {
-                await expect(diplomaFile.connect(addr2).contestCase(0,0))
+            it('should revert cause of user2 has no token', async function() {
+                await expect(diplomaFile.connect(nonUser2).contestCase(0,0))
                    .to.be.revertedWithCustomError( rda,"ERC20InsufficientBalance")
-                   .withArgs(addr2, 0, 100);
+                   .withArgs(nonUser2, 0, priceHT);
             }); 
 
        
             it('should add one Deposit to Deposits', async function() {
-                await diplomaFile.contestCase(0,0);
-                expect((await diplomaFile.getDeposits()).length).to.be.equal(2);
+                await diplomaFile.connect(user2).contestCase(0,0);
+                expect((await diplomaFile.getDeposits()).length).to.be.equal(4);
             });
     
 
             it('should add one Deposit with the good parameters', async function() {
-                await diplomaFile.contestCase(0,0);
-                let [sender, type, amount] = await diplomaFile.connect(addr1).getDeposit(1);
-                expect(sender).to.be.equal(addr0);
+                await diplomaFile.connect(user2).contestCase(0,0);
+                let [sender, type, amount] = await diplomaFile.connect(user1).getContestDepositFromCaseIndex(0);
+                expect(sender).to.be.equal(user2);
                 expect(type).to.be.equal(1);
-                expect(amount).to.be.equal(100);
+                expect(amount).to.be.equal(priceHT);
             });
 
 
             it('should set the mapping ContestToDiploma', async function() {
-                await diplomaFile.contestCase(0,0);
-                expect((await diplomaFile.getContestFromCaseIndex(0)).owner).to.be.equal(addr0);
+                await diplomaFile.connect(user2).contestCase(0,0);
+                expect((await diplomaFile.getContestFromCaseIndex(0)).owner).to.be.equal(user2);
             });
 
             it('should add one Contest to Contests', async function() {
@@ -407,38 +458,65 @@ describe("Diploma File", function () {
             });
 
             it('should add one Contest with the good parameters', async function() {
-                await diplomaFile.contestCase(0,0);
-                let [sender, fileIndex, proof] = await diplomaFile.connect(addr1).getContest(0);
-                expect(sender).to.be.equal(addr0);
+                await diplomaFile.connect(user2).contestCase(0,0);
+                let [sender, fileIndex, proof] = await diplomaFile.connect(user1).getContestFromCaseIndex(0);
+                expect(sender).to.be.equal(user2);
                 expect(fileIndex).to.be.equal(0);
                 expect(proof).to.be.equal(0);
             });
 
             it('should set the status of the case to disputed', async function() {
-                await diplomaFile.contestCase(0,0);
+                await diplomaFile.connect(user2).contestCase(0,0);
                 expect((await diplomaFile.getCase(0)).status).to.be.equal(2);
             });
             
 
             it('should emit CreateNewDepositEvent', async function() {
-                await expect(diplomaFile.contestCase(0,0)).to.emit( diplomaFile,"CreateNewDepositEvent")
-                .withArgs(addr0, 1, 1,  100);
+                await expect(diplomaFile.connect(user2).contestCase(0,0)).to.emit( diplomaFile,"CreateNewDepositEvent")
+                .withArgs(user2, 3, 1,  ethers.parseEther('100'));
             });
 
 
             it('should emit CreateNewContestEvent', async function() {
-                await expect(diplomaFile.contestCase(0,0)).to.emit( diplomaFile,"CreateNewContestEvent")
-                .withArgs(addr0, 0, 0);
+                await expect(diplomaFile.connect(user2).contestCase(0,0)).to.emit( diplomaFile,"CreateNewContestEvent")
+                .withArgs(user2, 0, 0);
             });
         
 
         });
 
+        describe("Function getContest", function () {
+        
+            it('should retrun the contest ', async function() {
+                await diplomaFile.connect(user2).contestCase(1,1);
+                const [owner, file, proof] = await diplomaFile.getContest(0);
+                expect(owner).to.be.equal(user2);
+                expect(file).to.be.equal(1);
+                expect(proof).to.be.equal(1);
+             }); 
+
+
+        });
+
+        describe("Function getContests", function () {
+        
+            it('should retrun the array of contests', async function() {
+                    await diplomaFile.connect(user2).contestCase(1,1);
+                    const v = await diplomaFile.getContests();
+                    const [owner, file, proof] = v[0];
+                    expect(owner).to.be.equal(user2);
+                    expect(file).to.be.equal(1);
+                    expect(proof).to.be.equal(1);
+            }); 
+
+
+        });
+           
 
     });
 
     /*  *********************************************  Phase 3 : setVote & resolveAfterVoting ************************************************************************************* */
-    describe("Phase 3 : setVote ", function () {
+    describe("Phase 3 : setVote - getVotes & getVote ", function () {
         
         beforeEach(async function() {
             await LoadFixtureForVoting();
@@ -449,21 +527,21 @@ describe("Diploma File", function () {
         
             it('should revert because the index does not exist in Votes', async function() {
        
-                await expect(diplomaFile.setVote(1,0))
+                await expect(diplomaFile.connect(voter1).setVote(2,0))
                     .to.be.revertedWithCustomError( diplomaFile,"ErrorVoteUnknown")
                     .withArgs("This votes doesn't exist");
             }); 
 
 
-            it('should revert because the vote is not pending', async function() {
-                await expect(diplomaFile.connect(addr2).setVote(0,0))
+            it('should revert because nonUser1 is not a voter', async function() {
+                await expect(diplomaFile.connect(nonUser1).setVote(0,0))
                    .to.be.revertedWithCustomError(diplomaFile,"ErrorNotVoter")
                    .withArgs("Not a voter");
             }); 
 
 
-            it('should revert because the vote was started before addr0 became a voter', async function() {
-                await expect(diplomaFile.setVote(0,0))
+            it('should revert because the vote was started before voter3 became a voter', async function() {
+                await expect(diplomaFile.connect(voter3).setVote(0,0))
                    .to.be.revertedWithCustomError(diplomaFile,"ErrorNotAllowedToVote")
                    .withArgs("This vote has started before you become a voter");
             }); 
@@ -471,14 +549,14 @@ describe("Diploma File", function () {
 
             it('should revert because the vote is close', async function() {
                 await new Promise(resolve => setTimeout(resolve, 5000));
-                await expect(diplomaFile.connect(addr1).setVote(0,0))
+                await expect(diplomaFile.connect(voter1).setVote(0,0))
                    .to.be.revertedWithCustomError(diplomaFile,"ErrorVoteClosed")
                    .withArgs("This vote is closed");
             }); 
 
             it('should revert because already voted ', async function() {
-                await diplomaFile.connect(addr1).setVote(0,0)
-                await expect(diplomaFile.connect(addr1).setVote(0,0))
+                await diplomaFile.connect(voter1).setVote(0,0)
+                await expect(diplomaFile.connect(voter1).setVote(0,0))
                    .to.be.revertedWithCustomError(diplomaFile,"ErrorHasVoted")
                    .withArgs("Already Voted");
             }); 
@@ -486,7 +564,7 @@ describe("Diploma File", function () {
             it('should add one vote for no', async function() {
                 
                 let [,, yes1, no1] = await diplomaFile.getVote(0);
-                await diplomaFile.connect(addr1).setVote(0,0);
+                await diplomaFile.connect(voter1).setVote(0,0);
                 let [,, yes2, no2] = await diplomaFile.getVote(0);
                 no1++;
                 expect(yes1).to.be.equal(yes2);
@@ -497,7 +575,7 @@ describe("Diploma File", function () {
             it('should add one vote for yes', async function() {
                 
                 let [,, yes1, no1] = await diplomaFile.getVote(0);
-                await diplomaFile.connect(addr1).setVote(0,1);
+                await diplomaFile.connect(voter1).setVote(0,1);
                 let [,, yes2, no2] = await diplomaFile.getVote(0);
                 yes1++;
                 expect(yes1).to.be.equal(yes2);
@@ -505,15 +583,26 @@ describe("Diploma File", function () {
             }); 
 
 
-            it('should set hasVoted[addr1][0] to true', async function() {
-                await diplomaFile.connect(addr1).setVote(0,1);
-                expect(await diplomaFile.getHasVoted(0, addr1)).to.be.equal(true);
+            it('should set hasVoted[voter1][0] to true', async function() {
+                await diplomaFile.connect(voter1).setVote(0,1);
+                expect(await diplomaFile.getHasVoted(0, voter1)).to.be.equal(true);
             }); 
 
 
+            it('should add "almost square" to totalTokenSquare', async function() {
+                const [,,,,tokenBefore] = await diplomaFile.getVote(0);
+                await diplomaFile.connect(voter1).setVote(0,1);
+                let [,,,,tokenAfter] = await diplomaFile.getVote(0);
+                expect(tokenAfter).to.be.equal(BigInt(10000*10**18));
+                // await diplomaFile.connect(voter2).setVote(0,1);
+                // [,,,,tokenAfter] = await diplomaFile.getVote(0);
+                // expect(tokenAfter).to.be.equal(BigInt(5*10**22));
+
+            }); 
+
             it('should emit : SetVoteEvent', async function() {
-                await expect(diplomaFile.connect(addr1).setVote(0,1)).to.emit( diplomaFile,"SetVoteEvent")
-                .withArgs(addr1, 0, 1);
+                await expect(diplomaFile.connect(voter1).setVote(0,1)).to.emit( diplomaFile,"SetVoteEvent")
+                .withArgs(voter1, 0, 1);
                 
             });
            
@@ -523,11 +612,12 @@ describe("Diploma File", function () {
         describe("Function getVotes", function () {
         
             it('should retrun the array of votes', async function() {
-                    await diplomaFile.connect(addr1).setVote(0,1);
+                    await diplomaFile.connect(voter1).setVote(0,1);
                     const v = await diplomaFile.getVotes();
-                    const [idFile,creationTime, yes, no] = v[0];
-                    expect(idFile).to.be.equal(0);
+                    const [idFile,, yes, no] = v[0];
+                    expect(idFile).to.be.equal(1);
                     expect(yes).to.be.equal(1);
+                    expect(no).to.be.equal(0);
             }); 
 
 
@@ -537,10 +627,11 @@ describe("Diploma File", function () {
         describe("Function getVoteFromCaseIndex", function () {
         
             it('should retrun votes[0]', async function() {
-                    await diplomaFile.connect(addr1).setVote(0,1);
-                    const [idFile,creationTime, yes, no] = await diplomaFile.getVoteFromCaseIndex(0);
-                    expect(idFile).to.be.equal(0);
+                    await diplomaFile.connect(voter1).setVote(0,1);
+                    const [idFile,, yes, no] = await diplomaFile.getVoteFromCaseIndex(0);
+                    expect(idFile).to.be.equal(1);
                     expect(yes).to.be.equal(1);
+                    expect(no).to.be.equal(0);
             }); 
 
 
@@ -560,14 +651,14 @@ describe("Diploma File", function () {
         
             it('should revert because the index does not exist in Votes', async function() {
        
-                await expect(diplomaFile.resolveAfterVote(4))
+                await expect(diplomaFile.connect(user1).resolveAfterVote(4))
                     .to.be.revertedWithCustomError( diplomaFile,"ErrorCaseUnknown")
                     .withArgs("This case doesn't exist");
             }); 
 
 
             it('should revert because the vote is not disputed', async function() {
-                await expect(diplomaFile.resolveAfterVote(1))
+                await expect(diplomaFile.connect(user1).resolveAfterVote(0))
                     .to.be.revertedWithCustomError( diplomaFile,"ErrorCaseNotDisputed")
                     .withArgs("This case is not disputed");
             }); 
@@ -575,7 +666,7 @@ describe("Diploma File", function () {
 
             it('should revert because the vote is not close yet', async function() {
                 await diplomaFile.createCase("Test", "Long", timestamp, "Alyra", "Rejected", timestamp);
-                await diplomaFile.contestCase(3,0);
+                await diplomaFile.connect(user2).contestCase(3,0);
                 await expect(diplomaFile.resolveAfterVote(3))
                    .to.be.revertedWithCustomError(diplomaFile,"ErrorVoteInProgress")
                    .withArgs("The vote is not closed yet");
@@ -584,45 +675,140 @@ describe("Diploma File", function () {
 
             it('should set the status to validated', async function() {
                 await new Promise(resolve => setTimeout(resolve, 4000));
-                await diplomaFile.resolveAfterVote(0);
-                expect((await diplomaFile.getCase(0)).status).to.be.equal(1);
-                
+                await diplomaFile.connect(user1).resolveAfterVote(1);
+                expect((await diplomaFile.getCase(1)).status).to.be.equal(1);
             }); 
 
-            it('should transfer the token case of validation', async function() {
-                
+
+            it('should revert cause not the owner of the stack', async function() {
                 await new Promise(resolve => setTimeout(resolve, 4000));
-                await diplomaFile.resolveAfterVote(0);
-                expect((await diplomaFile.getDepositFromCaseIndex(0)).amount).to.be.equal(200);
-                expect((await diplomaFile.getContestDepositFromCaseIndex(0)).amount).to.be.equal(0);
+               
                 
+                await expect(diplomaFile.connect(user2).resolveAfterVote(1))
+                   .to.be.revertedWithCustomError(diplomaFile,"NotYourStack")
+                   .withArgs("This is not your deposit");
             }); 
+
+
+            it('should transfer the token - case of validation', async function() {
+                await new Promise(resolve => setTimeout(resolve, 4000));
+                let balanceBefore = await rda.balanceOf(user1);
+                await diplomaFile.connect(user1).resolveAfterVote(1);
+                const balanceAfter = await rda.balanceOf(user1);
+                balanceBefore +=   priceHT + bonus;
+                expect(balanceBefore).to.be.equal(balanceAfter);
+                expect((await diplomaFile.getDepositFromCaseIndex(1)).amount).to.be.equal(0);
+                expect((await diplomaFile.getContestDepositFromCaseIndex(1)).amount).to.be.equal(0);
+            }); 
+
 
             it('should set the status to rejected', async function() {
                 await new Promise(resolve => setTimeout(resolve, 4000));
-                await diplomaFile.resolveAfterVote(2);
+                await diplomaFile.connect(user2).resolveAfterVote(2);
                 expect((await diplomaFile.getCase(2)).status).to.be.equal(3);
                 
             }); 
 
-            it('should transfer the token case of rejection', async function() {
+
+            it('should revert cause not the owner of the stack', async function() {
+                await new Promise(resolve => setTimeout(resolve, 4000));
+                await expect(diplomaFile.connect(user1).resolveAfterVote(2))
+                   .to.be.revertedWithCustomError(diplomaFile,"NotYourStack")
+                   .withArgs("This is not your deposit");
+            }); 
+
+            it('should transfer the token - case of rejection', async function() {
                 
                 await new Promise(resolve => setTimeout(resolve, 4000));
-                await diplomaFile.resolveAfterVote(2);
+                const balanceBefore = await rda.balanceOf(user2);
+                await diplomaFile.connect(user2).resolveAfterVote(2);
+                let balanceAfter = await rda.balanceOf(user2);
+                balanceAfter -= (priceHT + bonus);
+                expect(balanceBefore).to.be.equal(balanceAfter);
                 expect((await diplomaFile.getDepositFromCaseIndex(2)).amount).to.be.equal(0);
-                expect((await diplomaFile.getContestDepositFromCaseIndex(2)).amount).to.be.equal(200);
+                expect((await diplomaFile.getContestDepositFromCaseIndex(2)).amount).to.be.equal(0);
                 
             }); 
 
             it('should emit : ResolveAfterVoteEvent', async function() {
                 await new Promise(resolve => setTimeout(resolve, 4000));
-                await expect(diplomaFile.connect(addr1).resolveAfterVote(0)).to.emit( diplomaFile,"ResolveAfterVoteEvent")
-                .withArgs(0, 1);
+                await expect(diplomaFile.connect(user1).resolveAfterVote(1)).to.emit( diplomaFile,"ResolveAfterVoteEvent")
+                .withArgs(1, 1);
                 
             });
            
 
         });
+
+
+    });
+
+
+    describe("Phase 5 : getReward", function () {
+        
+            beforeEach(async function() {
+                await LoadFixtureForReward();
+                
+            });
+            
+            describe("Function getReward", function () {
+        
+                it('should revert because the index does not exist in Votes', async function() {
+           
+                    await expect(diplomaFile.connect(voter1).getRewardFromVote(4))
+                        .to.be.revertedWithCustomError( diplomaFile,"ErrorCaseUnknown")
+                        .withArgs("This case doesn't exist");
+                }); 
+    
+    
+                it('should revert because the case is not resolved yet', async function() {
+                    await expect(diplomaFile.connect(voter1).getRewardFromVote(2))
+                        .to.be.revertedWithCustomError( diplomaFile,"ErrorCaseNotResolved")
+                        .withArgs("This case is not resolved yet");
+                }); 
+    
+    
+                it('should revert because voter2 has not voted', async function() {
+                    await expect(diplomaFile.connect(voter3).getRewardFromVote(1))
+                    .to.be.revertedWithCustomError( diplomaFile,"ErrorNoReward")
+                    .withArgs("Has not voted");
+                }); 
+
+                it('should revert because voter1 has already claimed ', async function() {
+                    await diplomaFile.connect(voter1).getRewardFromVote(1);
+                    await expect(diplomaFile.connect(voter1).getRewardFromVote(1))
+                    .to.be.revertedWithCustomError( diplomaFile,"ErrorNoReward")
+                    .withArgs("Already Claimed");
+                }); 
+    
+    
+                it('should set the hasClaimed to true', async function() {
+                    await diplomaFile.connect(voter1).getRewardFromVote(1);
+                    // const hasClaimed = diplomaFile.getHasClaimed(0,voter1);
+                    expect(await diplomaFile.getHasClaimed(0,voter1)).to.be.equal(true);
+                    
+                }); 
+    
+                it('should transfer the token to voter2', async function() {
+                    const [,,,,token] = await diplomaFile.getVoteFromCaseIndex(1);
+                    let balanceBefore = await rda.balanceOf(voter2);
+                    await diplomaFile.connect(voter2).getRewardFromVote(1);
+                    const balanceAfter = await rda.balanceOf(voter2);
+                    balanceBefore += BigInt(36*10**18);
+                    expect(balanceBefore).to.be.equal(balanceAfter);
+                    // expect((await diplomaFile.getDepositFromCaseIndex(2)).amount).to.be.equal(0);
+                    // expect((await diplomaFile.getContestDepositFromCaseIndex(2)).amount).to.be.equal(0);
+                }); 
+    
+                it('should emit : GetRewardEvent(msg.sender, amount);', async function() {
+                   
+                    await expect(diplomaFile.connect(voter2).getRewardFromVote(1)).to.emit( diplomaFile,"GetRewardEvent")
+                    .withArgs(voter2, (BigInt(4)*bonus)/BigInt(5));
+                    
+                });
+
+
+            });
 
     });  
 

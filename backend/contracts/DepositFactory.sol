@@ -34,11 +34,13 @@ contract DepositFactory {
 
     RealDiplomaToken RdaToken;
     Deposit[] Deposits; 
+    address daoAddress;
     
    
 
-    constructor (RealDiplomaToken _token)  {
+    constructor (RealDiplomaToken _token, address _daoAddress)  {
         RdaToken = _token;
+        daoAddress = _daoAddress;
 
     }
 
@@ -51,29 +53,24 @@ contract DepositFactory {
     }
     
    
-    function createNewDeposit( DepositType _type, uint _amount) internal {
+    function createNewDeposit( DepositType _type, uint _amount, uint _cut) internal {
         
-    //    if(RdaToken.balanceOf(msg.sender) < _amount)
-        //    revert ErrorNotEnoughFund("Not enough token");
-       
-        require(RdaToken.transferFrom(msg.sender, address(this), _amount));
-        Deposits.push(Deposit(msg.sender, _type, _amount));
+        uint fees = (_amount*_cut)/100;
+        uint amount = _amount - fees; 
+
+        require(RdaToken.transferFrom(msg.sender, address(this), amount));
+        if(_cut !=0)
+            require(RdaToken.transferFrom(msg.sender, daoAddress, fees));
+        
+        Deposits.push(Deposit(msg.sender, _type, amount));
         emit CreateNewDepositEvent(msg.sender, Deposits.length-1, _type, _amount);
                
     }
 
     function closeDeposit(uint _index) internal {
-        // if(_index >= Deposits.length) 
-            // revert StackUnkwown("this stack doesn't exist"); 
-
+         
         if(Deposits[_index].owner != msg.sender)
             revert  NotYourStack("This is not your deposit");
-
-        // if(!Deposits[_index].withdrawAllowed)
-            // revert  NotYetUnlocked("Still Locked");
-
-        // if(Deposits[_index].amount == 0)
-            // revert DepositIsEmpty("No token left");
 
         uint amount = Deposits[_index].amount;
         Deposits[_index].amount = 0; 
@@ -83,10 +80,10 @@ contract DepositFactory {
         emit CloseDepositEvent(msg.sender, _index, amount);
     }
 
-    function internalTransfer(uint _indexFrom, uint _indexTo, uint _amount) internal {
+    function executeDealing(uint _indexLoserDeposit, uint _indexWinnerDeposit, uint _bonus) internal {
         
-        Deposits[_indexFrom].amount -= _amount;
-        Deposits[_indexTo].amount += _amount;
+        Deposits[_indexLoserDeposit].amount = 0;
+        Deposits[_indexWinnerDeposit].amount += _bonus ;
     
     }
    

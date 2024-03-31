@@ -21,21 +21,27 @@ contract VoteFactory  {
         uint tokenAmount;
     }
 
+    struct Reward {
+        bool hasVoted;
+        bool hasClaimed;
+    }
+
     struct Vote {
         uint idFile;
         uint creationTime;
         uint yes;
         uint no;
+        uint totalTokenSquare;
        
     }
 
     Vote[] Votes;
     mapping (address => Voter) mapVoter;
-    mapping(uint => mapping(address => bool)) hasVoted;
+    mapping(uint => mapping(address => Reward)) VoteToReward;
 
    
 
-    uint constant votingDelay = 3 seconds;
+    uint constant votingDelay = 5 seconds;
 
     constructor () {
        
@@ -55,7 +61,11 @@ contract VoteFactory  {
     }
 
     function getHasVoted(uint _index, address _addr) external view returns(bool) {
-        return hasVoted[_index][_addr];
+        return VoteToReward[_index][_addr].hasVoted;
+    }
+
+    function getHasClaimed(uint _index, address _addr) external view returns(bool) {
+        return VoteToReward[_index][_addr].hasClaimed;
     }
 
 
@@ -67,7 +77,7 @@ contract VoteFactory  {
         if(mapVoter[msg.sender].tokenAmount == 0)
             revert ErrorNotVoter("Not a voter");
     
-        if(hasVoted[_index][msg.sender])
+        if(VoteToReward[_index][msg.sender].hasVoted)
             revert ErrorHasVoted("Already Voted");
 
         if(Votes[_index].creationTime < mapVoter[msg.sender].registrationTime)
@@ -82,11 +92,17 @@ contract VoteFactory  {
         if(_choice == 1)
             Votes[_index].yes++;
         
-        hasVoted[_index][msg.sender] = true;
+        Votes[_index].totalTokenSquare += (mapVoter[msg.sender].tokenAmount * (mapVoter[msg.sender].tokenAmount/10**18));
+
+        VoteToReward[_index][msg.sender].hasVoted = true;
 
         emit SetVoteEvent(msg.sender, _index, _choice);
    
     }
+
+   
+
+
 
 
 

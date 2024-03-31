@@ -12,7 +12,7 @@ contract RealDiplomaToken is ERC20, Ownable {
     }
 
     function mint(address _to, uint _amount) external onlyOwner {
-        _mint(_to, _amount);
+        _mint(_to, _amount*10**18);
     }
 
 
