@@ -18,7 +18,7 @@ contract DiplomaFile is DiplomaFactory, DepositFactory, VoteFactory  {
     error ErrorNoReward(string msgError);
     error ErrorCaseNotResolved(string msgError);
 
-    event CreateNewFileEvent(uint index, address owner, uint creationTime, AuthStatus status);
+    event CreateNewCaseEvent(uint index, address owner, uint creationTime);
     event SimpleResolve(uint index);
     event CreateNewContestEvent(address owner, uint index, ContestationProof proof);
     event ResolveAfterVoteEvent(uint indexFile, AuthStatus status);
@@ -124,7 +124,7 @@ contract DiplomaFile is DiplomaFactory, DepositFactory, VoteFactory  {
         createNewDiploma(_lastName, _firstName, _birthday, _school, _diplomaName, _diplomaDate);
         CaseToDiploma[Cases.length] = Diplomas.length-1; 
         Cases.push(File(msg.sender, block.timestamp, AuthStatus.pending));
-        emit CreateNewFileEvent(Cases.length-1, msg.sender, block.timestamp, AuthStatus.pending);
+        emit CreateNewCaseEvent(Cases.length-1, msg.sender, block.timestamp);
     }
 
     function contestCase(uint _fileIndex, ContestationProof _proof) external {
@@ -215,6 +215,7 @@ contract DiplomaFile is DiplomaFactory, DepositFactory, VoteFactory  {
 
         emit BecomeVoterEvent(msg.sender, _amount);
     }
+
 
     function getRewardFromVote(uint _index) external {
         

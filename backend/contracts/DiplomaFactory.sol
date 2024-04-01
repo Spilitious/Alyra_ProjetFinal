@@ -15,7 +15,7 @@ contract DiplomaFactory {
     /// @param diplomaName The name of the diploma
     /// @param diplomaDate The date of issuance of the diploma
     event CreateNewDiplomaEvent(uint index, string lastName, string firstName, uint birthday, string  school, string  diplomaName, uint diplomaDate);  
-
+    
     /// @notice Struct representing a Diploma
     struct Diploma {
         string lastName;

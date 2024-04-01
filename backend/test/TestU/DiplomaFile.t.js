@@ -5,7 +5,7 @@ const { ethers } = require('hardhat');
 require("@nomicfoundation/hardhat-toolbox/network-helpers");
 
 let user0, user1, user2, nonUser1, nonUser2,nonUser3, voter1, voter2, voter3, daoAddress; 
-let diplomaFile, rda;
+let diplomaFile, rda, diplomaNFT;
 let timestamp;
 let price, priceHT, fees, bonus;
 //Test pour changer quelque chose 
@@ -37,6 +37,11 @@ async function LoadFixtureForCreateCase() {
     diplomaFile = await ethers.getContractFactory("DiplomaFile");
     diplomaFile = await diplomaFile.deploy(rda.target, daoAddress);
     await diplomaFile.waitForDeployment();
+
+    //Deploiement DiplomaNFT
+    diplomaNFT = await ethers.getContractFactory("DiplomaNFT");
+    diplomaNFT = await diplomaNFT.deploy(diplomaFile.target);
+    await diplomaNFT.waitForDeployment();
     
     //Distribution de token et allowance
     await rda.approve(diplomaFile.target, ethers.parseEther('1000'));
@@ -79,7 +84,7 @@ async function LoadFixtureForContestCase() {
 async function LoadFixtureForVoting() {
 
     
-    // voter1 & voter2 sont enregistré en tant que voter avant la contestation des dossier et pourra donc voter sur tous les dossiers
+    // voter1 & voter2 sont enregistré en tant que voter avant la contestation des dossier et pourront donc voter sur tous les dossiers
     await diplomaFile.connect(voter1).becomeVoter(ethers.parseEther('100'));
     await diplomaFile.connect(voter2).becomeVoter(ethers.parseEther('200'));
     
@@ -121,7 +126,7 @@ async function LoadFixtureForReward() {
 /* ****************************************************************** TESTING ************************************************************************** */
 /******************************************************************************************************************************************************* */
 
-describe("Diploma File", function () {
+describe("TEST", function () {
    
     beforeEach(async function() {
         await LoadFixtureForCreateCase();
@@ -129,16 +134,7 @@ describe("Diploma File", function () {
      });
 
 
-    /* **************************************************************  Déploiement  ******************************************************************** */
-
-    describe("Deploiement", function() {
-       
-        it('price should be equal to variable price', async function() {
-            expect(await diplomaFile.price()).to.be.equal(price);
-        });
-    });
-
-
+    
     /* ************************************************************** RealDiplomaToken  ***************************************************************** */
 
     describe("RealDiplomaToken", function() {
@@ -146,6 +142,26 @@ describe("Diploma File", function () {
         it('should revert because not the owner', async function() {
             await expect(rda.connect(user1).mint(user1, 1000))
                 .to.be.revertedWithCustomError(rda, "OwnableUnauthorizedAccount");
+        });
+
+        it('should get _totalSupply', async function() {
+            expect(await rda.connect(user1).maxSupply()).to.be.equal(BigInt(10**7))
+              
+        });
+    });
+
+/* **************************************************************  Déploiement  ******************************************************************** */
+    describe("DiplomaFile Deploiement", function() {
+       
+        it('price should be equal to variable price', async function() {
+            expect(await diplomaFile.price()).to.be.equal(price);
+        });
+    });
+
+    describe("DiplomaNFT Deploiement", function() {
+       
+        it('name should be equal to RealDiplomaNFT', async function() {
+            expect(await diplomaNFT.name()).to.be.equal("RealDiplomaNFT");
         });
     });
     
@@ -287,7 +303,15 @@ describe("Diploma File", function () {
                 expect((await diplomaFile.getCases()).length).to.be.equal(1);
             });
 
+            it('should send the fees to the daoAddress', async function() {
+                let balanceBefore = await rda.balanceOf(daoAddress);
+                await diplomaFile.createCase("Leb", "Aur", timestamp, "Alyra", "Dev", timestamp);
+                const balanceAfter = await rda.balanceOf(daoAddress);
+                balanceBefore += fees;
+                expect(balanceBefore).to.be.equal(balanceAfter);
+            });
 
+            
             it('should add one Case with the good parameters', async function() {
                 await diplomaFile.createCase("Leb", "Aur", timestamp, "Alyra", "Dev", timestamp);
                 let [owner, , status] = await diplomaFile.connect(user1).getCase(0);
@@ -470,6 +494,14 @@ describe("Diploma File", function () {
                 await diplomaFile.connect(user2).contestCase(0,0);
                 expect((await diplomaFile.getCase(0)).status).to.be.equal(2);
             });
+
+            it('should send the fees to the daoAddress', async function() {
+                let balanceBefore = await rda.balanceOf(daoAddress);
+                await diplomaFile.connect(user2).contestCase(0,0);
+                const balanceAfter = await rda.balanceOf(daoAddress);
+                balanceBefore += fees;
+                expect(balanceBefore).to.be.equal(balanceAfter);
+            });
             
 
             it('should emit CreateNewDepositEvent', async function() {
@@ -481,6 +513,42 @@ describe("Diploma File", function () {
             it('should emit CreateNewContestEvent', async function() {
                 await expect(diplomaFile.connect(user2).contestCase(0,0)).to.emit( diplomaFile,"CreateNewContestEvent")
                 .withArgs(user2, 0, 0);
+            });
+        
+
+        });
+
+        describe.only("Function mintDiploma", function () {
+        
+            it('should revert because the index does not exist in Cases ', async function() {
+       
+                await expect(diplomaNFT.mintDiploma(5))
+                    .to.be.revertedWithCustomError( diplomaNFT,"ErrorCaseUnknown")
+                    .withArgs("This file doesn't exist");
+            }); 
+
+
+            it('should revert because the diploma is your own', async function() {
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                await expect(diplomaNFT.connect(user1).mintDiploma(0))
+                    .to.be.revertedWithCustomError( diplomaNFT,"ErrorNotYourCase")
+                    .withArgs("Not your case");
+            }); 
+
+
+            it('should revert because the diploma is not validated', async function() {
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                await expect(diplomaNFT.mintDiploma(0))
+                    .to.be.revertedWithCustomError( diplomaNFT,"ErrorCaseNotValidated")
+                    .withArgs("Not Validated");
+            }); 
+
+
+            it.only('should emit MintNFTEvent', async function() {
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                await diplomaFile.simpleResolve(0);
+                await expect(diplomaNFT.mintDiploma(0)).to.emit( diplomaNFT,"MintNFTEvent")
+                .withArgs(1);
             });
         
 
@@ -702,7 +770,7 @@ describe("Diploma File", function () {
                 expect((await diplomaFile.getContestDepositFromCaseIndex(1)).amount).to.be.equal(0);
             }); 
 
-
+            
             it('should set the status to rejected', async function() {
                 await new Promise(resolve => setTimeout(resolve, 4000));
                 await diplomaFile.connect(user2).resolveAfterVote(2);
