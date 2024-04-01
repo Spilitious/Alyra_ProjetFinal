@@ -34,8 +34,8 @@ contract DiplomaFile is DiplomaFactory, DepositFactory, VoteFactory  {
 
     struct File {
         address owner;
-        uint creationTime;
         AuthStatus status;
+        uint creationTime;
         
     }
 
@@ -48,8 +48,8 @@ contract DiplomaFile is DiplomaFactory, DepositFactory, VoteFactory  {
 
     struct Contest {
         address owner;
-        uint file; 
         ContestationProof Proof;
+        // uint file;
         // uint amount;
         // bool withdraw;
     }
@@ -123,7 +123,7 @@ contract DiplomaFile is DiplomaFactory, DepositFactory, VoteFactory  {
         CaseToDeposit[Cases.length] = Deposits.length-1; 
         createNewDiploma(_lastName, _firstName, _birthday, _school, _diplomaName, _diplomaDate);
         CaseToDiploma[Cases.length] = Diplomas.length-1; 
-        Cases.push(File(msg.sender, block.timestamp, AuthStatus.pending));
+        Cases.push(File(msg.sender,  AuthStatus.pending, block.timestamp));
         emit CreateNewCaseEvent(Cases.length-1, msg.sender, block.timestamp);
     }
 
@@ -145,11 +145,11 @@ contract DiplomaFile is DiplomaFactory, DepositFactory, VoteFactory  {
         Cases[_fileIndex].status = AuthStatus.disputed;
        
         //Creation du contest et update du mapping
-        Contests.push(Contest(msg.sender, _fileIndex, _proof));
+        Contests.push(Contest(msg.sender, _proof));
         CaseToContest[_fileIndex] = Contests.length-1;
         
         //Creation du vote et update du mapping
-        Votes.push(Vote(_fileIndex, block.timestamp, 0,0,0));   
+        Votes.push(Vote(block.timestamp, 0,0,0));   
         CaseToVote[_fileIndex] = Votes.length-1;     
         
         //Event

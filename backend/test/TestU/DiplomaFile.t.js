@@ -314,7 +314,7 @@ describe("TEST", function () {
             
             it('should add one Case with the good parameters', async function() {
                 await diplomaFile.createCase("Leb", "Aur", timestamp, "Alyra", "Dev", timestamp);
-                let [owner, , status] = await diplomaFile.connect(user1).getCase(0);
+                let [owner, status] = await diplomaFile.connect(user1).getCase(0);
                 expect(owner).to.be.equal(user0);
                 expect(status).to.be.equal(0);
             });
@@ -327,7 +327,7 @@ describe("TEST", function () {
                 await expect(diplomaFile.createCase("Leb", "Aur", timestamp, "Alyra", "Dev", timestamp)).to.emit( diplomaFile,"CreateNewDepositEvent")
                 .withArgs(user0, 1, 0, ethers.parseEther('100'));
 
-                await expect(diplomaFile.createCase("Leb", "Aur", timestamp, "Alyra", "Dev", timestamp)).to.emit( diplomaFile,"CreateNewFileEvent");
+                await expect(diplomaFile.createCase("Leb", "Aur", timestamp, "Alyra", "Dev", timestamp)).to.emit( diplomaFile,"CreateNewCaseEvent");
                 //.withArgs(2, user0, 1 ,0);
             });
 
@@ -484,9 +484,8 @@ describe("TEST", function () {
 
             it('should add one Contest with the good parameters', async function() {
                 await diplomaFile.connect(user2).contestCase(0,0);
-                let [sender, fileIndex, proof] = await diplomaFile.connect(user1).getContestFromCaseIndex(0);
+                let [sender, proof] = await diplomaFile.connect(user1).getContestFromCaseIndex(0);
                 expect(sender).to.be.equal(user2);
-                expect(fileIndex).to.be.equal(0);
                 expect(proof).to.be.equal(0);
             });
 
@@ -518,13 +517,13 @@ describe("TEST", function () {
 
         });
 
-        describe.only("Function mintDiploma", function () {
+        describe("Function mintDiploma", function () {
         
             it('should revert because the index does not exist in Cases ', async function() {
        
                 await expect(diplomaNFT.mintDiploma(5))
                     .to.be.revertedWithCustomError( diplomaNFT,"ErrorCaseUnknown")
-                    .withArgs("This file doesn't exist");
+                    .withArgs("Unknown case");
             }); 
 
 
@@ -542,12 +541,29 @@ describe("TEST", function () {
                     .to.be.revertedWithCustomError( diplomaNFT,"ErrorCaseNotValidated")
                     .withArgs("Not Validated");
             }); 
-
-
-            it.only('should emit MintNFTEvent', async function() {
+            
+            it('should create a NFT with the good parameters', async function() {
                 await new Promise(resolve => setTimeout(resolve, 3000));
                 await diplomaFile.simpleResolve(0);
-                await expect(diplomaNFT.mintDiploma(0)).to.emit( diplomaNFT,"MintNFTEvent")
+                await diplomaNFT.mintDiploma(0);
+                const [, lastName, firstName] = await diplomaNFT.getRdaNft(0);
+                expect(lastName).to.be.equal("Leb");
+                expect(firstName).to.be.equal("Aur");
+            });
+
+
+            it('should mint the NFT to user0', async function() {
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                await diplomaFile.simpleResolve(0);
+                await diplomaNFT.mintDiploma(0);
+                expect(await diplomaNFT.ownerOf(1)).to.be.equal(user0);
+            });
+
+
+            it('should emit MintNFTEvent', async function() {
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                await diplomaFile.simpleResolve(0);
+                await expect(diplomaNFT.mintDiploma(0)).to.emit( diplomaNFT,"MintNftEvent")
                 .withArgs(1);
             });
         
@@ -558,9 +574,8 @@ describe("TEST", function () {
         
             it('should retrun the contest ', async function() {
                 await diplomaFile.connect(user2).contestCase(1,1);
-                const [owner, file, proof] = await diplomaFile.getContest(0);
+                const [owner, proof] = await diplomaFile.getContest(0);
                 expect(owner).to.be.equal(user2);
-                expect(file).to.be.equal(1);
                 expect(proof).to.be.equal(1);
              }); 
 
@@ -572,9 +587,8 @@ describe("TEST", function () {
             it('should retrun the array of contests', async function() {
                     await diplomaFile.connect(user2).contestCase(1,1);
                     const v = await diplomaFile.getContests();
-                    const [owner, file, proof] = v[0];
+                    const [owner, proof] = v[0];
                     expect(owner).to.be.equal(user2);
-                    expect(file).to.be.equal(1);
                     expect(proof).to.be.equal(1);
             }); 
 
@@ -598,7 +612,7 @@ describe("TEST", function () {
        
                 await expect(diplomaFile.connect(voter1).setVote(2,0))
                     .to.be.revertedWithCustomError( diplomaFile,"ErrorVoteUnknown")
-                    .withArgs("This votes doesn't exist");
+                    .withArgs("This vote doesn't exist");
             }); 
 
 
@@ -612,7 +626,7 @@ describe("TEST", function () {
             it('should revert because the vote was started before voter3 became a voter', async function() {
                 await expect(diplomaFile.connect(voter3).setVote(0,0))
                    .to.be.revertedWithCustomError(diplomaFile,"ErrorNotAllowedToVote")
-                   .withArgs("This vote has started before you become a voter");
+                   .withArgs("This vote started before you became a voter");
             }); 
 
 
@@ -632,9 +646,9 @@ describe("TEST", function () {
 
             it('should add one vote for no', async function() {
                 
-                let [,, yes1, no1] = await diplomaFile.getVote(0);
+                let [, yes1, no1] = await diplomaFile.getVote(0);
                 await diplomaFile.connect(voter1).setVote(0,0);
-                let [,, yes2, no2] = await diplomaFile.getVote(0);
+                let [, yes2, no2] = await diplomaFile.getVote(0);
                 no1++;
                 expect(yes1).to.be.equal(yes2);
                 expect(no1).to.be.equal(no2);
@@ -643,9 +657,9 @@ describe("TEST", function () {
 
             it('should add one vote for yes', async function() {
                 
-                let [,, yes1, no1] = await diplomaFile.getVote(0);
+                let [, yes1, no1] = await diplomaFile.getVote(0);
                 await diplomaFile.connect(voter1).setVote(0,1);
-                let [,, yes2, no2] = await diplomaFile.getVote(0);
+                let [, yes2, no2] = await diplomaFile.getVote(0);
                 yes1++;
                 expect(yes1).to.be.equal(yes2);
                 expect(no1).to.be.equal(no2);
@@ -659,9 +673,9 @@ describe("TEST", function () {
 
 
             it('should add "almost square" to totalTokenSquare', async function() {
-                const [,,,,tokenBefore] = await diplomaFile.getVote(0);
+                const [,,,tokenBefore] = await diplomaFile.getVote(0);
                 await diplomaFile.connect(voter1).setVote(0,1);
-                let [,,,,tokenAfter] = await diplomaFile.getVote(0);
+                let [,,,tokenAfter] = await diplomaFile.getVote(0);
                 expect(tokenAfter).to.be.equal(BigInt(10000*10**18));
                 // await diplomaFile.connect(voter2).setVote(0,1);
                 // [,,,,tokenAfter] = await diplomaFile.getVote(0);
@@ -683,8 +697,7 @@ describe("TEST", function () {
             it('should retrun the array of votes', async function() {
                     await diplomaFile.connect(voter1).setVote(0,1);
                     const v = await diplomaFile.getVotes();
-                    const [idFile,, yes, no] = v[0];
-                    expect(idFile).to.be.equal(1);
+                    const [, yes, no] = v[0];
                     expect(yes).to.be.equal(1);
                     expect(no).to.be.equal(0);
             }); 
@@ -695,10 +708,9 @@ describe("TEST", function () {
 
         describe("Function getVoteFromCaseIndex", function () {
         
-            it('should retrun votes[0]', async function() {
+            it('should return votes[0]', async function() {
                     await diplomaFile.connect(voter1).setVote(0,1);
-                    const [idFile,, yes, no] = await diplomaFile.getVoteFromCaseIndex(0);
-                    expect(idFile).to.be.equal(1);
+                    const [, yes, no] = await diplomaFile.getVoteFromCaseIndex(0);
                     expect(yes).to.be.equal(1);
                     expect(no).to.be.equal(0);
             }); 

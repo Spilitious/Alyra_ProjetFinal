@@ -13,7 +13,7 @@ contract DiplomaNFT is ERC721{
     error ErrorAlreadyMinted(string msgError);
     error ErrorCaseUnknown(string msgError);
 
-    event MintNFTEvent(uint index);
+    event MintNftEvent(uint index);
     // address diplomaFileAddress;
     DiplomaFile DiplomaFileContract;
 
@@ -29,7 +29,7 @@ contract DiplomaNFT is ERC721{
    
 
 
-    RdaNft[] RealDiplomaNFTs;
+    RdaNft[] RealDiplomaNfts;
 
     constructor(address _diplomaFileAddress) ERC721 ("RealDiplomaNFT", "RDANFT") {
         // diplomaFileAddress = _diplomaFileAddress;
@@ -37,20 +37,21 @@ contract DiplomaNFT is ERC721{
 
     }
 
-    function getRdaNFT(uint _index) external returns(RdaNft memory {
-        return RealDiplomaNFTs[_index]
+    function getRdaNft(uint _index) external view returns(RdaNft memory) {
+        return RealDiplomaNfts[_index];
     }
 
 
     function mintDiploma(uint _indexFile) external returns (uint256)
     {
-        // File memory info 
         uint lg = DiplomaFileContract.getCases().length;
+        if(_indexFile >= lg)
+            revert ErrorCaseUnknown("Unknown case");
+
+
         address owner = DiplomaFileContract.getCase(_indexFile).owner;
         uint8 status = uint8(DiplomaFileContract.getCase(_indexFile).status);
        
-        if(_indexFile >= lg)
-            revert ErrorCaseUnknown("Unknown case");
         if(owner != msg.sender)
             revert ErrorNotYourCase("Not your case");
         if(status != 1)
@@ -65,12 +66,10 @@ contract DiplomaNFT is ERC721{
         string memory diplomaName = DiplomaFileContract.getDiplomaFromCaseIndex(_indexFile).diplomaName;
         uint  diplomaDate = DiplomaFileContract.getDiplomaFromCaseIndex(_indexFile).diplomaDate;
        
-        RealDiplomaNFTs.push(RdaNft(block.timestamp, lastName, firstName, birthday, school, diplomaName, diplomaDate));
-
+        RealDiplomaNfts.push(RdaNft(block.timestamp, lastName, firstName, birthday, school, diplomaName, diplomaDate));
 
         _mint(msg.sender, _indexFile+1);
-        // _setTokenURI(newItemId, _tokenURI);
-        emit MintNFTEvent(_indexFile+1);
+        emit MintNftEvent(_indexFile+1);
 
         return _indexFile;
     }
