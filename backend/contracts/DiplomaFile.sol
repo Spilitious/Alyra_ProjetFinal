@@ -78,10 +78,10 @@ contract DiplomaFile is DiplomaFactory, DepositFactory, VoteFactory, Ownable  {
     
 
     /// @notice The delay (in seconds) during a dispute can be initiated after a case is created.
-    uint DisputeDelay = 600 seconds;
+    uint public DisputeDelay = 600 seconds;
 
     /// @notice The delay (in seconds) for voting after a dispute is initiated.
-    uint votingDelay = 600 seconds;
+    uint public votingDelay = 600 seconds;
 
     /// @notice The price (in wei) required for create a case and dispute a case.
     uint public constant price = 100*(10**18);
@@ -333,12 +333,12 @@ contract DiplomaFile is DiplomaFactory, DepositFactory, VoteFactory, Ownable  {
 
     /// @notice Sets the vote choice for the specified index.
     /// @dev This function is external.
-    /// @param _index The index of the vote.
+    /// @param _fileIndex The index of the case.
     /// @param _choice The choice to be set (0 for no, 1 for yes).
-    function setVote(uint _index, uint _choice) external {
+    function setVote(uint _fileIndex, uint _choice) external {
         // Check if the specified vote index exists
-        if (Votes.length <= _index) {
-            revert ErrorVoteUnknown("This vote doesn't exist");
+        if (Cases.length <= _fileIndex) {
+            revert ErrorCaseUnknown("This case doesn't exist");
         }
 
         // Check if the sender is a registered voter
@@ -347,36 +347,36 @@ contract DiplomaFile is DiplomaFactory, DepositFactory, VoteFactory, Ownable  {
         }
 
         // Check if the sender has already voted for this vote index
-        if (VoteToReward[_index][msg.sender].hasVoted) {
+        if (VoteToReward[CaseToVote[_fileIndex]][msg.sender].hasVoted) {
             revert ErrorHasVoted("Already Voted");
         }
 
         // Check if the vote started before the sender became a voter
-        if (Votes[_index].creationTime < mapVoter[msg.sender].registrationTime) {
+        if (Votes[CaseToVote[_fileIndex]].creationTime < mapVoter[msg.sender].registrationTime) {
             revert ErrorNotAllowedToVote("This vote started before you became a voter");
         }
 
         // Check if the vote is still open
-        if (block.timestamp > Votes[_index].creationTime + votingDelay) {
+        if (block.timestamp > Votes[CaseToVote[_fileIndex]].creationTime + votingDelay) {
             revert ErrorVoteClosed("This vote is closed");
         }
 
         // Increment the vote count based on the choice
         if (_choice == 0) 
-            ++Votes[_index].no;
+            ++Votes[CaseToVote[_fileIndex]].no;
         
         if (_choice == 1) 
-            ++Votes[_index].yes;
+            ++Votes[CaseToVote[_fileIndex]].yes;
     
 
         // Update the total token square for the vote
-        Votes[_index].totalTokenSquare += ((mapVoter[msg.sender].tokenAmount /10**2) * (mapVoter[msg.sender].tokenAmount / 10**18));
+        Votes[CaseToVote[_fileIndex]].totalTokenSquare += ((mapVoter[msg.sender].tokenAmount /10**2) * (mapVoter[msg.sender].tokenAmount / 10**18));
 
         // Mark the sender as having voted for this vote index
-        VoteToReward[_index][msg.sender].hasVoted = true;
+        VoteToReward[CaseToVote[_fileIndex]][msg.sender].hasVoted = true;
 
         // Emit an event to signify that a vote has been set
-         emit SetVoteEvent(msg.sender, _index, _choice);
+         emit SetVoteEvent(msg.sender, _fileIndex, _choice);
 
     }
 

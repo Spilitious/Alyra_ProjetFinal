@@ -36,7 +36,6 @@ async function mint() {
     let ownerAfter = await rdaNft(0);
     console.log("OwnerAfter du NFT 0 : ", ownerAfter)
 
-    
    
     const [id, lastName, firstName, birthday] = await diplomaNFT.getRdaNft(0);
     console.log("Id : ", id);

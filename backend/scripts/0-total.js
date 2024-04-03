@@ -132,7 +132,9 @@ async function main() {
  [registrationTime, tokenAmount] = await diplomaFile.getVoter(voter3);
  console.log("---------------------------- VOTER 3 --------------------------------------")
  console.log(registrationTime, tokenAmount);
-   
+  
+ let contractBalance = await rda.balanceOf(diplomaFile.target);
+ console.log("Contract Balance : ", contractBalance);
 
  console.log('\x1b[36m%s\x1b[0m',"/* *************************************************************************** Création de dossier ************************************************************* */")
  /* *************************************************************************************** ********************************************************************************* */
@@ -171,7 +173,7 @@ async function main() {
     console.log(lastName, firstName, getDate(birthday), school, title, getDate(dimplomaDate));
     console.log(depostierAddress, creationTime, status);
 
-    let contractBalance = await rda.balanceOf(diplomaFile.target);
+    contractBalance = await rda.balanceOf(diplomaFile.target);
     console.log("Contract Balance : ", contractBalance);
 
    
@@ -201,9 +203,9 @@ async function main() {
 
     console.log("---------------------------- Résoluition DOSSIER 0 --------------------------------------")
     console.log("Balance User0 Avant", userBalanceBefore);
-    console.log("Balance User0 Avant", userBalanceAfter);
+    console.log("Balance User0 Après", userBalanceAfter);
     console.log("Status Avant", statusBefore);
-    console.log("Status Avant", statusAfter);
+    console.log("Status Après", statusAfter);
     
     console.log("Contract Balance : ", contractBalance);
 
@@ -246,17 +248,17 @@ async function main() {
     console.log(creationTime1, yes, no, tokenAmountSquare)
 
     
-    await diplomaFile.connect(voter1).setVote(0,0);
+    await diplomaFile.connect(voter1).setVote(1,0);
     [creationTime1, yes, no, tokenAmountSquare] = await diplomaFile.getVote(0)
     console.log("Etat du vote après le vote du voter1")
     console.log(creationTime1, yes, no, tokenAmountSquare)
     
-    await diplomaFile.connect(voter2).setVote(0,1);
+    await diplomaFile.connect(voter2).setVote(1,1);
     [creationTime1, yes, no, tokenAmountSquare] = await diplomaFile.getVote(0)
     console.log("Etat du vote après le vote du voter2")
     console.log(creationTime1, yes, no, tokenAmountSquare)
 
-    await diplomaFile.connect(voter3).setVote(0,1);
+    await diplomaFile.connect(voter3).setVote(1,1);
     [creationTime1, yes, no, tokenAmountSquare] = await diplomaFile.getVote(0)
     console.log("Etat du vote après le vote du voter3")
     console.log(creationTime1, yes, no, tokenAmountSquare)
@@ -278,7 +280,7 @@ async function main() {
 
     await diplomaFile.connect(user1).resolveAfterVote(1);
     balanceBefore = await rda.balanceOf(diplomaFile.target);
-    console.log("BALANCE AVANT")
+    console.log("BALANCE APRES")
     console.log("Contract : ", balanceBefore);
     balanceBefore = await rda.balanceOf(user1);
     console.log("user1   : ", balanceBefore);

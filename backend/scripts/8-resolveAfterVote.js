@@ -41,63 +41,13 @@ async function resolveAfterVote() {
     
 
     await diplomaFile.resolveAfterVote(1);
-    let balanceBefore = await rda.balanceOf(diplomaFile.target);
+    balanceBefore = await rda.balanceOf(diplomaFile.target);
     console.log("BALANCE AVANT")
     console.log("Contract : ", balanceBefore);
     balanceBefore = await rda.balanceOf(user1);
     console.log("user1   : ", balanceBefore);
     balanceBefore = await rda.balanceOf(user2);
     console.log("user2   : ", balanceBefore);
-
-    let [creationTime, yes, no, tokenAmountSquare] = await diplomaFile.getVote(0)
-    console.log("Etat du vote intial")
-    console.log(creationTime, yes, no, tokenAmountSquare)
-
-    
-    await diplomaFile.connect(voter1).setVote(0,0);
-    [creationTime, yes, no, tokenAmountSquare] = await diplomaFile.getVote(0)
-    console.log("Etat du vote après le vote du voter1")
-    console.log(creationTime, yes, no, tokenAmountSquare)
-    
-    await diplomaFile.connect(voter2).setVote(0,1);
-    [creationTime, yes, no, tokenAmountSquare] = await diplomaFile.getVote(0)
-    console.log("Etat du vote après le vote du voter1")
-    console.log(creationTime, yes, no, tokenAmountSquare)
-
-    await diplomaFile.connect(voter3).setVote(0,1);
-    [creationTime, yes, no, tokenAmountSquare] = await diplomaFile.getVote(0)
-    console.log("Etat du vote après le vote du voter1")
-    console.log(creationTime, yes, no, tokenAmountSquare)
-
-    await diplomaFile.setVotingDelay(1);
-    let balanceBefore = await rda.balanceOf(diplomaFile.target);
-    console.log("BALANCE AVANT")
-    console.log("Contract : ", balanceBefore);
-    balanceBefore = await rda.balanceOf(voter1);
-    console.log("Voter1   : ", balanceBefore);
-    balanceBefore = await rda.balanceOf(voter2);
-    console.log("Voter2   : ", balanceBefore);
-    balanceBefore = await rda.balanceOf(voter3);
-    console.log("Voter3   : ", balanceBefore);
-
-    await diplomaFile.connect(voter1).getRewardFromVote(0);
-    await diplomaFile.connect(voter2).getRewardFromVote(0);
-    await diplomaFile.connect(voter3).getRewardFromVote(0);
-    console.log("BALANCE AFTER")
-    
-    balanceBefore = await rda.balanceOf(diplomaFile.target);
-    console.log("Contract : ", balanceBefore);
-    balanceBefore = await rda.balanceOf(voter1);
-    let sum = balanceBefore;
-    console.log("Voter1   : ", balanceBefore);
-    balanceBefore = await rda.balanceOf(voter2);
-    sum += balanceBefore
-    console.log("Voter2   : ", balanceBefore);
-    balanceBefore = await rda.balanceOf(voter3);
-    sum += balanceBefore;
-    console.log("Voter3   : ", balanceBefore);
-    console.log(sum)
-    
    
 }
 

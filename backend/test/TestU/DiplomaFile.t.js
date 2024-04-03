@@ -106,15 +106,15 @@ async function LoadFixtureForResolving() {
     
     await LoadFixtureForVoting();
     // voter1 vote yes pour le litige du dossier 1 et pour le litige du dossier 2
-    await diplomaFile.connect(voter1).setVote(0,1);
     await diplomaFile.connect(voter1).setVote(1,1);
+    await diplomaFile.connect(voter1).setVote(2,1);
     
     // voter2 vote yes pour le litige du dossier 1 et no pour le litige du dossier 2
-    await diplomaFile.connect(voter2).setVote(0,1);
-    await diplomaFile.connect(voter2).setVote(1,0);
+    await diplomaFile.connect(voter2).setVote(1,1);
+    await diplomaFile.connect(voter2).setVote(2,0);
 
     // voter3 vote no pour le litige du dossier 2 
-    await diplomaFile.connect(voter3).setVote(1,0);
+    await diplomaFile.connect(voter3).setVote(2,0);
 }
 
 async function LoadFixtureForReward() {
@@ -200,7 +200,7 @@ describe("TEST", function () {
             it('should revert cause too small amount', async function() {
                 await expect(diplomaFile.connect(voter1).becomeVoter(ethers.parseEther('9')))
                     .to.be.revertedWithCustomError( diplomaFile,"ErrorAmountMin")
-                    .withArgs("Amount min is 10");
+                    .withArgs("Minimum deposit amount is 10 tokens");
             }); 
 
             it('should add one Deposit to Deposits', async function() {
@@ -632,9 +632,9 @@ describe("TEST", function () {
         
             it('should revert because the index does not exist in Votes', async function() {
        
-                await expect(diplomaFile.connect(voter1).setVote(2,0))
-                    .to.be.revertedWithCustomError( diplomaFile,"ErrorVoteUnknown")
-                    .withArgs("This vote doesn't exist");
+                await expect(diplomaFile.connect(voter1).setVote(7,0))
+                    .to.be.revertedWithCustomError( diplomaFile,"ErrorCaseUnknown")
+                    .withArgs("This case doesn't exist");
             }); 
 
 
@@ -883,7 +883,7 @@ describe("TEST", function () {
                     await diplomaFile.connect(voter1).getRewardFromVote(1);
                     await expect(diplomaFile.connect(voter1).getRewardFromVote(1))
                     .to.be.revertedWithCustomError( diplomaFile,"ErrorNoReward")
-                    .withArgs("Already Claimed");
+                    .withArgs("Already claimed");
                 }); 
     
     
