@@ -24,7 +24,7 @@ Event emitted when a new deposit is created
 | ---- | ---- | ----------- |
 | owner | address | The address of the deposit owner |
 | idDeposit | uint256 | The identifier of the deposit |
-| kind | enum DepositFactory.DepositType | The type of deposit (fileDeposit, contestDeposit, voteDeposit) |
+| kind | enum DepositFactory.DepositType | The type of deposit (fileDeposit, DisputeDeposit, voteDeposit) |
 | amount | uint256 | The amount of the deposit |
 
 ### CloseDepositEvent
@@ -66,7 +66,7 @@ Enum representing the types of deposits
 ```solidity
 enum DepositType {
   fileDeposit,
-  contestDeposit,
+  DisputeDeposit,
   voteDeposit
 }
 ```
@@ -374,6 +374,12 @@ error ErrorNoReward(string msgError)
 error ErrorCaseNotResolved(string msgError)
 ```
 
+### ErrorAmountMin
+
+```solidity
+error ErrorAmountMin(string msgError)
+```
+
 ### CreateNewCaseEvent
 
 ```solidity
@@ -386,10 +392,10 @@ event CreateNewCaseEvent(uint256 index, address owner, uint256 creationTime)
 event SimpleResolve(uint256 index)
 ```
 
-### CreateNewContestEvent
+### CreateNewDisputeEvent
 
 ```solidity
-event CreateNewContestEvent(address owner, uint256 index, enum DiplomaFile.ContestationProof proof)
+event CreateNewDisputeEvent(address owner, uint256 index, enum DiplomaFile.DisputeProof proof)
 ```
 
 ### ResolveAfterVoteEvent
@@ -412,6 +418,8 @@ event GetRewardEvent(address voter, uint256 amount)
 
 ### AuthStatus
 
+Enumeration of different authentication statuses for a file
+
 ```solidity
 enum AuthStatus {
   pending,
@@ -423,18 +431,22 @@ enum AuthStatus {
 
 ### File
 
+Structure representing a file
+
 ```solidity
 struct File {
   address owner;
-  uint256 creationTime;
   enum DiplomaFile.AuthStatus status;
+  uint256 creationTime;
 }
 ```
 
-### ContestationProof
+### DisputeProof
+
+Enumeration of different types of dispute proofs
 
 ```solidity
-enum ContestationProof {
+enum DisputeProof {
   schoolLetter,
   fullPromo,
   presence,
@@ -442,13 +454,14 @@ enum ContestationProof {
 }
 ```
 
-### Contest
+### Dispute
+
+Structure representing a dispute
 
 ```solidity
-struct Contest {
+struct Dispute {
   address owner;
-  uint256 file;
-  enum DiplomaFile.ContestationProof Proof;
+  enum DiplomaFile.DisputeProof Proof;
 }
 ```
 
@@ -458,17 +471,19 @@ struct Contest {
 struct DiplomaFile.File[] Cases
 ```
 
-### Contests
+### Disputes
 
 ```solidity
-struct DiplomaFile.Contest[] Contests
+struct DiplomaFile.Dispute[] Disputes
 ```
 
-### CaseToContest
+### CaseToDispute
 
 ```solidity
-mapping(uint256 => uint256) CaseToContest
+mapping(uint256 => uint256) CaseToDispute
 ```
+
+Maps a case to its associated dispute ID.
 
 ### CaseToDeposit
 
@@ -476,17 +491,23 @@ mapping(uint256 => uint256) CaseToContest
 mapping(uint256 => uint256) CaseToDeposit
 ```
 
+Maps a case to its associated deposit ID.
+
 ### CaseToDiploma
 
 ```solidity
 mapping(uint256 => uint256) CaseToDiploma
 ```
 
-### CaseToContestDeposit
+Maps a case to its associated diploma ID.
+
+### CaseToDisputeDeposit
 
 ```solidity
-mapping(uint256 => uint256) CaseToContestDeposit
+mapping(uint256 => uint256) CaseToDisputeDeposit
 ```
+
+Maps a case to its associated dispute deposit ID.
 
 ### CaseToVote
 
@@ -494,11 +515,23 @@ mapping(uint256 => uint256) CaseToContestDeposit
 mapping(uint256 => uint256) CaseToVote
 ```
 
-### contestDelay
+Maps a case to its associated vote ID.
+
+### DisputeDelay
 
 ```solidity
-uint256 contestDelay
+uint256 DisputeDelay
 ```
+
+The delay (in seconds) during a dispute can be initiated after a case is created.
+
+### votingDelay
+
+```solidity
+uint256 votingDelay
+```
+
+The delay (in seconds) for voting after a dispute is initiated.
 
 ### price
 
@@ -506,11 +539,15 @@ uint256 contestDelay
 uint256 price
 ```
 
+The price (in wei) required for create a case and dispute a case.
+
 ### fee
 
 ```solidity
 uint256 fee
 ```
+
+The fee (in percentage) applied to certain transactions.
 
 ### constructor
 
@@ -524,23 +561,67 @@ constructor(contract RealDiplomaToken _token, address _daoAddress) public
 function getCases() external view returns (struct DiplomaFile.File[])
 ```
 
+Retrieves all cases.
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | struct DiplomaFile.File[] | An array of File structs representing all cases. |
+
 ### getCase
 
 ```solidity
 function getCase(uint256 _index) external view returns (struct DiplomaFile.File)
 ```
 
-### getContests
+Retrieves a specific case by index.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _index | uint256 | The index of the case to retrieve. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | struct DiplomaFile.File | The File struct representing the case at the specified index. |
+
+### getDisputes
 
 ```solidity
-function getContests() external view returns (struct DiplomaFile.Contest[])
+function getDisputes() external view returns (struct DiplomaFile.Dispute[])
 ```
 
-### getContest
+Retrieves all disputes.
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | struct DiplomaFile.Dispute[] | An array of Dispute structs representing all disputes. |
+
+### getDispute
 
 ```solidity
-function getContest(uint256 _index) external view returns (struct DiplomaFile.Contest)
+function getDispute(uint256 _index) external view returns (struct DiplomaFile.Dispute)
 ```
+
+Retrieves a specific dispute by index.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _index | uint256 | The index of the dispute to retrieve. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | struct DiplomaFile.Dispute | The Dispute struct representing the dispute at the specified index. |
 
 ### getDepositFromCaseIndex
 
@@ -548,23 +629,79 @@ function getContest(uint256 _index) external view returns (struct DiplomaFile.Co
 function getDepositFromCaseIndex(uint256 _index) external view returns (struct DepositFactory.Deposit)
 ```
 
+Retrieves the deposit associated with a specific case index.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _index | uint256 | The index of the case for which to retrieve the deposit. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | struct DepositFactory.Deposit | The Deposit struct representing the deposit associated with the specified case index. |
+
 ### getDiplomaFromCaseIndex
 
 ```solidity
 function getDiplomaFromCaseIndex(uint256 _index) external view returns (struct DiplomaFactory.Diploma)
 ```
 
-### getContestFromCaseIndex
+Retrieves the diploma associated with a specific case index.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _index | uint256 | The index of the case for which to retrieve the diploma. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | struct DiplomaFactory.Diploma | The Diploma struct representing the diploma associated with the specified case index. |
+
+### getDisputeFromCaseIndex
 
 ```solidity
-function getContestFromCaseIndex(uint256 _index) external view returns (struct DiplomaFile.Contest)
+function getDisputeFromCaseIndex(uint256 _index) external view returns (struct DiplomaFile.Dispute)
 ```
 
-### getContestDepositFromCaseIndex
+Retrieves the dispute associated with a specific case index.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _index | uint256 | The index of the case for which to retrieve the dispute. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | struct DiplomaFile.Dispute | The Dispute struct representing the dispute associated with the specified case index. |
+
+### getDisputeDepositFromCaseIndex
 
 ```solidity
-function getContestDepositFromCaseIndex(uint256 _index) external view returns (struct DepositFactory.Deposit)
+function getDisputeDepositFromCaseIndex(uint256 _index) external view returns (struct DepositFactory.Deposit)
 ```
+
+Retrieves the deposit associated with a specific case index's dispute.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _index | uint256 | The index of the case for which to retrieve the dispute deposit. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | struct DepositFactory.Deposit | The Deposit struct representing the dispute deposit associated with the specified case index. |
 
 ### getVoteFromCaseIndex
 
@@ -572,11 +709,67 @@ function getContestDepositFromCaseIndex(uint256 _index) external view returns (s
 function getVoteFromCaseIndex(uint256 _index) external view returns (struct VoteFactory.Vote)
 ```
 
+Retrieves the vote associated with a specific case index.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _index | uint256 | The index of the case for which to retrieve the vote. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | struct VoteFactory.Vote | The Vote struct representing the vote associated with the specified case index. |
+
 ### getBonus
 
 ```solidity
 function getBonus() public pure returns (uint256)
 ```
+
+Calculates the bonus amount.
+
+_This function is public and pure._
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | uint256 | The bonus amount, which is half of the price excluding taxes. |
+
+### setDisputeDelay
+
+```solidity
+function setDisputeDelay(uint256 _delay) external
+```
+
+Sets the dispute delay.
+
+_This function can only be called by the owner._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _delay | uint256 | The new dispute delay value to be set. |
+
+### setVotingDelay
+
+```solidity
+function setVotingDelay(uint256 _votingDelay) external
+```
+
+Sets the voting delay.
+
+_This function can only be called by the owner._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _votingDelay | uint256 | The new voting delay value to be set. |
 
 ### createCase
 
@@ -584,11 +777,37 @@ function getBonus() public pure returns (uint256)
 function createCase(string _lastName, string _firstName, uint256 _birthday, string _school, string _diplomaName, uint256 _diplomaDate) external
 ```
 
-### contestCase
+Creates a new case.
+
+_This function creates a new case, initiates a deposit for the case, and creates a new diploma._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _lastName | string | The last name of the person associated with the case. |
+| _firstName | string | The first name of the person associated with the case. |
+| _birthday | uint256 | The birthday of the person associated with the case. |
+| _school | string | The school associated with the case. |
+| _diplomaName | string | The name of the diploma associated with the case. |
+| _diplomaDate | uint256 | The date of the diploma associated with the case. |
+
+### disputeCase
 
 ```solidity
-function contestCase(uint256 _fileIndex, enum DiplomaFile.ContestationProof _proof) external
+function disputeCase(uint256 _fileIndex, enum DiplomaFile.DisputeProof _proof) external
 ```
+
+Disputes a case.
+
+_This function allows a user to dispute a case by providing a dispute proof._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _fileIndex | uint256 | The index of the file associated with the dispute. |
+| _proof | enum DiplomaFile.DisputeProof | The proof provided for the dispute. |
 
 ### simpleResolve
 
@@ -596,11 +815,31 @@ function contestCase(uint256 _fileIndex, enum DiplomaFile.ContestationProof _pro
 function simpleResolve(uint256 _index) external
 ```
 
+Resolves a case without dispute.
+
+_This function resolves a case without dispute by closing the associated deposit and setting the case status to "validated"._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _index | uint256 | The index of the case to resolve. |
+
 ### resolveAfterVote
 
 ```solidity
 function resolveAfterVote(uint256 _fileIndex) external
 ```
+
+Resolves a disputed case after the voting period has ended.
+
+_This function resolves a disputed case after the voting period has ended by executing appropriate actions based on the voting results._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _fileIndex | uint256 | The index of the disputed case to resolve. |
 
 ### becomeVoter
 
@@ -608,10 +847,119 @@ function resolveAfterVote(uint256 _fileIndex) external
 function becomeVoter(uint256 _amount) external
 ```
 
+Allows an address to become a voter by depositing tokens.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _amount | uint256 | The amount of tokens to deposit for becoming a voter. |
+
+### setVote
+
+```solidity
+function setVote(uint256 _index, uint256 _choice) external
+```
+
+Sets the vote choice for the specified index.
+
+_This function is external._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _index | uint256 | The index of the vote. |
+| _choice | uint256 | The choice to be set (0 for no, 1 for yes). |
+
 ### getRewardFromVote
 
 ```solidity
 function getRewardFromVote(uint256 _index) external
+```
+
+Allows a voter to claim their reward for participating in a vote.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _index | uint256 | The index of the case associated with the vote. |
+
+## DiplomaNft
+
+### ErrorCaseNotValidated
+
+```solidity
+error ErrorCaseNotValidated(string msgError)
+```
+
+### ErrorNotYourCase
+
+```solidity
+error ErrorNotYourCase(string msgError)
+```
+
+### ErrorAlreadyMinted
+
+```solidity
+error ErrorAlreadyMinted(string msgError)
+```
+
+### ErrorCaseUnknown
+
+```solidity
+error ErrorCaseUnknown(string msgError)
+```
+
+### MintNftEvent
+
+```solidity
+event MintNftEvent(uint256 index)
+```
+
+### DiplomaFileContract
+
+```solidity
+contract DiplomaFile DiplomaFileContract
+```
+
+### RdaNft
+
+```solidity
+struct RdaNft {
+  uint256 validationDate;
+  string lastName;
+  string firstName;
+  uint256 birthday;
+  string school;
+  string diplomaName;
+  uint256 diplomaDate;
+}
+```
+
+### RealDiplomaNfts
+
+```solidity
+struct DiplomaNft.RdaNft[] RealDiplomaNfts
+```
+
+### constructor
+
+```solidity
+constructor(address _diplomaFileAddress) public
+```
+
+### getRdaNft
+
+```solidity
+function getRdaNft(uint256 _index) external view returns (struct DiplomaNft.RdaNft)
+```
+
+### mintDiploma
+
+```solidity
+function mintDiploma(uint256 _indexFile) external returns (uint256)
 ```
 
 ## RealDiplomaToken
@@ -651,11 +999,16 @@ Mint additional tokens and send them to the specified address.
 
 ## VoteFactory
 
+A contract for managing voting operations on disputed cases.
+
 ### ErrorNotVoter
 
 ```solidity
 error ErrorNotVoter(string msgError)
 ```
+
+Errors
+Error thrown when a voter is not registered.
 
 ### ErrorVoteClosed
 
@@ -663,11 +1016,15 @@ error ErrorNotVoter(string msgError)
 error ErrorVoteClosed(string msgError)
 ```
 
+Error thrown when attempting to vote in a closed vote.
+
 ### ErrorNotAllowedToVote
 
 ```solidity
 error ErrorNotAllowedToVote(string msgError)
 ```
+
+Error thrown when a voter is not allowed to vote (registered too late)
 
 ### ErrorHasVoted
 
@@ -675,11 +1032,15 @@ error ErrorNotAllowedToVote(string msgError)
 error ErrorHasVoted(string msgError)
 ```
 
+Error thrown when a voter has already voted.
+
 ### ErrorVoteUnknown
 
 ```solidity
 error ErrorVoteUnknown(string msgError)
 ```
+
+Error thrown when attempting to interact with an unknown vote.
 
 ### SetVoteEvent
 
@@ -687,7 +1048,20 @@ error ErrorVoteUnknown(string msgError)
 event SetVoteEvent(address voter, uint256 voteIndex, uint256 choice)
 ```
 
+Events
+Event emitted when a vote is cast.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| voter | address | The address of the voter. |
+| voteIndex | uint256 | The index of the vote. |
+| choice | uint256 | The choice made by the voter (e.g., yes or no). |
+
 ### Voter
+
+Structure representing a voter.
 
 ```solidity
 struct Voter {
@@ -698,6 +1072,8 @@ struct Voter {
 
 ### Reward
 
+Structure representing a reward.
+
 ```solidity
 struct Reward {
   bool hasVoted;
@@ -707,9 +1083,10 @@ struct Reward {
 
 ### Vote
 
+Structure representing a vote.
+
 ```solidity
 struct Vote {
-  uint256 idFile;
   uint256 creationTime;
   uint256 yes;
   uint256 no;
@@ -723,6 +1100,8 @@ struct Vote {
 struct VoteFactory.Vote[] Votes
 ```
 
+State variables
+
 ### mapVoter
 
 ```solidity
@@ -733,12 +1112,6 @@ mapping(address => struct VoteFactory.Voter) mapVoter
 
 ```solidity
 mapping(uint256 => mapping(address => struct VoteFactory.Reward)) VoteToReward
-```
-
-### votingDelay
-
-```solidity
-uint256 votingDelay
 ```
 
 ### constructor
@@ -753,11 +1126,37 @@ constructor() public
 function getVote(uint256 _index) external view returns (struct VoteFactory.Vote)
 ```
 
+Returns the vote at the specified index.
+
+_This function is external and view._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _index | uint256 | The index of the vote to retrieve. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | struct VoteFactory.Vote | The vote at the specified index. |
+
 ### getVotes
 
 ```solidity
 function getVotes() external view returns (struct VoteFactory.Vote[])
 ```
+
+Returns all the votes.
+
+_This function is external and view._
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | struct VoteFactory.Vote[] | An array containing all the struct Vote. |
 
 ### getVoter
 
@@ -765,11 +1164,44 @@ function getVotes() external view returns (struct VoteFactory.Vote[])
 function getVoter(address _addr) external view returns (struct VoteFactory.Voter)
 ```
 
+Returns the voter information for the specified address.
+
+_This function is external and view._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _addr | address | The address of the voter. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | struct VoteFactory.Voter | The voter information. |
+
 ### getHasVoted
 
 ```solidity
 function getHasVoted(uint256 _index, address _addr) external view returns (bool)
 ```
+
+Checks if the specified address has voted for the given vote index.
+
+_This function is external and view._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _index | uint256 | The index of the vote. |
+| _addr | address | The address to check. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | bool | True if the address has voted, otherwise false. |
 
 ### getHasClaimed
 
@@ -777,9 +1209,20 @@ function getHasVoted(uint256 _index, address _addr) external view returns (bool)
 function getHasClaimed(uint256 _index, address _addr) external view returns (bool)
 ```
 
-### setVote
+Checks if the specified address has claimed the reward for the given vote index.
 
-```solidity
-function setVote(uint256 _index, uint256 _choice) external
-```
+_This function is external and view._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _index | uint256 | The index of the vote. |
+| _addr | address | The address to check. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | bool | True if the address has claimed the reward, otherwise false. |
 

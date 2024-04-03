@@ -1,7 +1,7 @@
 const hre = require("hardhat");
 
 
-async function simpleResolve() {
+async function becomeVoter() {
  
     /* **************************************************************** Init **************************************** */
 
@@ -30,25 +30,34 @@ async function simpleResolve() {
 
     /* ********************************************************** Execution *********************************************************** */
 
-    // Resolution du dossier 1 - Pas eu de contestation 
-    const userBalanceBefore = await rda.balanceOf(user0);
-    let [,,statusBefore] = await diplomaFile.getCase(0);
-    await diplomaFile.connect(user1).simpleResolve(0);
-    const userBalanceAfter = await rda.balanceOf(user0);
-    let [,,statusAfter] = await diplomaFile.getCase(0);
+    // voter1 devient voter avec 100 tokens
+    await diplomaFile.connect(voter1).becomeVoter(ethers.parseEther('100'));
+        
+    // voter2 devient voter avec 100 tokens
+    await diplomaFile.connect(voter2).becomeVoter(ethers.parseEther('200'));
+        
+    // voter3 devient voter avec 100 tokens
+    await diplomaFile.connect(voter3).becomeVoter(ethers.parseEther('300'));
         
 
-    /* ************************************************* Sortie console ************************************************** */
+    /* ************************************************* Lecture et sortie console ************************************************** */
 
-    console.log("---------------------------- Résoluition DOSSIER 1 --------------------------------------")
-    console.log("Balance User0 Avant", userBalanceBefore);
-    console.log("Balance User0 Avant", userBalanceAfter);
-    console.log("Status Avant", statusBefore);
-    console.log("Status Avant", statusAfter);
+    let [registrationTime, tokenAmount] = await diplomaFile.getVoter(voter1);
    
+    console.log("---------------------------- DOSSIER 1 --------------------------------------")
+    console.log(registrationTime, tokenAmount);
+
+    [registrationTime, tokenAmount] = await diplomaFile.getVoter(voter2);
+    console.log("---------------------------- DOSSIER 2 --------------------------------------")
+    console.log(registrationTime, tokenAmount);
+
+    [registrationTime, tokenAmount] = await diplomaFile.getVoter(voter3);
+    console.log("---------------------------- DOSSIER 3 --------------------------------------")
+    console.log(registrationTime, tokenAmount);
+
 }
 
-simpleResolve().catch((error) => {
+becomeVoter().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });

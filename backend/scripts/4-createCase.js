@@ -46,21 +46,21 @@ async function createSomeCase() {
     let [lastName, firstName, birthday, school, title, dimplomaDate] = await diplomaFile.getDiploma(0);
     let [depostierAddress, creationTime, status] = await diplomaFile.getCase(0);
     console.log("---------------------------- DOSSIER 1 --------------------------------------")
-    console.log(lastName, firstName, birthday, school, title, dimplomaDate);
+    console.log(lastName, firstName, getDate(birthday), school, title, getDate(dimplomaDate));
     console.log(depostierAddress, creationTime, status);
    
 
     [lastName, firstName, birthday, school, title, dimplomaDate] = await diplomaFile.getDiploma(1);
     [depostierAddress, creationTime, status] = await diplomaFile.getCase(1);
     console.log("---------------------------- DOSSIER 2 --------------------------------------")
-    console.log(lastName, firstName, birthday, school, title, dimplomaDate);
+    console.log(lastName, firstName, getDate(birthday), school, title, getDate(dimplomaDate));
     console.log(depostierAddress, creationTime, status);
 
 
     [lastName, firstName, birthday, school, title, dimplomaDate] = await diplomaFile.getDiploma(2);
     [depostierAddress, creationTime, status] = await diplomaFile.getCase(2);
     console.log("---------------------------- DOSSIER 3 --------------------------------------")
-    console.log(lastName, firstName, birthday, school, title, dimplomaDate);
+    console.log(lastName, firstName, getDate(birthday), school, title, getDate(dimplomaDate));
     console.log(depostierAddress, creationTime, status);
 }
 
@@ -68,3 +68,15 @@ createSomeCase().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
+
+function getDate(timestamp) {
+  const date = new Date(Number(timestamp * BigInt(1000)));
+
+  const day = date.getDate();
+  const month = date.getMonth() + 1; 
+  const year = date.getFullYear();
+  
+  // Formater la date en chaîne de caractères
+  const formattedDate = `${day}/${month}/${year}`;
+  return formattedDate;
+  }

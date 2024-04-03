@@ -39,10 +39,13 @@ async function LoadFixtureForCreateCase() {
     await diplomaFile.waitForDeployment();
 
     //Deploiement DiplomaNFT
-    diplomaNFT = await ethers.getContractFactory("DiplomaNFT");
+    diplomaNFT = await ethers.getContractFactory("DiplomaNft");
     diplomaNFT = await diplomaNFT.deploy(diplomaFile.target);
     await diplomaNFT.waitForDeployment();
     
+    await diplomaFile.setDisputeDelay(3);
+    await diplomaFile.setVotingDelay(5);
+
     //Distribution de token et allowance
     await rda.approve(diplomaFile.target, ethers.parseEther('1000'));
     await rda.mint(user1, 1000);
@@ -72,31 +75,31 @@ async function LoadFixtureForCreateCase() {
     priceHT = price - fees;
 }
 
-async function LoadFixtureForContestCase() {
-    // user0 crée un premier dossier - dossier 0 qui ne sera pas contesté
+async function LoadFixtureForDisputeCase() {
+    // user0 crée un premier dossier - dossier 0 qui ne sera pas Disputeé
     await diplomaFile.createCase("Leb", "Aur", timestamp, "Alyra", "Dev", timestamp);
-    // user1 crée un deuxième dossier qui sera contesté puis validé
+    // user1 crée un deuxième dossier qui sera Disputeé puis validé
     await diplomaFile.connect(user1).createCase("Cyr", "Ben", timestamp, "Disputed", "Valid", timestamp);
-    // user1 crée un troisième dossier qui sera contesté puis rejeté
+    // user1 crée un troisième dossier qui sera Disputeé puis rejeté
     await diplomaFile.connect(user1).createCase("Cheater", "Long", timestamp, "Disputed", "Reject", timestamp);
 }
 
 async function LoadFixtureForVoting() {
 
     
-    // voter1 & voter2 sont enregistré en tant que voter avant la contestation des dossier et pourront donc voter sur tous les dossiers
+    // voter1 & voter2 sont enregistré en tant que voter avant la Disputeation des dossier et pourront donc voter sur tous les dossiers
     await diplomaFile.connect(voter1).becomeVoter(ethers.parseEther('100'));
     await diplomaFile.connect(voter2).becomeVoter(ethers.parseEther('200'));
     
-    await LoadFixtureForContestCase();
-    // user3 conteste le dossier 1 avec la preuve 0
-    await diplomaFile.connect(user2).contestCase(1,0);
+    await LoadFixtureForDisputeCase();
+    // user3 Disputee le dossier 1 avec la preuve 0
+    await diplomaFile.connect(user2).disputeCase(1,0);
 
     // voter3 est enregistré après la contetation du dossier 0 et ne pourra donc pas voter pour ce dossier
-    await diplomaFile.connect(voter3).becomeVoter(ethers.parseEther('200'));
+    await diplomaFile.connect(voter3).becomeVoter(ethers.parseEther('300'));
 
-    //user2 conteste le dossier 2 avec la preuve 1
-    await diplomaFile.connect(user2).contestCase(2,1);
+    //user2 Disputee le dossier 2 avec la preuve 1
+    await diplomaFile.connect(user2).disputeCase(2,1);
 }
 
 async function LoadFixtureForResolving() {
@@ -119,7 +122,7 @@ async function LoadFixtureForReward() {
     await LoadFixtureForResolving();
     // user1 a son premier dossier validé et lance la résolution 
     await diplomaFile.connect(user1).resolveAfterVote(1);
-    // user1 a son deuxième dossier rejecté, user2 qui l'a contesté lance la résolution
+    // user1 a son deuxième dossier rejecté, user2 qui l'a Disputeé lance la résolution
     //await diplomaFile.connect(user2).resolveAfterVote(2);
 }
 
@@ -135,34 +138,38 @@ describe("TEST", function () {
 
 
     
-    /* ************************************************************** RealDiplomaToken  ***************************************************************** */
+   /* **************************************************************  Déploiement   ******************************************************************** */
+    describe("Deployment 3 contracts", function() {
 
-    describe("RealDiplomaToken", function() {
+        describe("RealDiplomaToken Deployment", function() {
        
-        it('should revert because not the owner', async function() {
-            await expect(rda.connect(user1).mint(user1, 1000))
-                .to.be.revertedWithCustomError(rda, "OwnableUnauthorizedAccount");
+            it('should revert because not the owner', async function() {
+                await expect(rda.connect(user1).mint(user1, 1000))
+                    .to.be.revertedWithCustomError(rda, "OwnableUnauthorizedAccount");
+            });
+    
+            it('should get _totalSupply', async function() {
+                expect(await rda.connect(user1).maxSupply()).to.be.equal(BigInt(10**7))
+                  
+            });
         });
-
-        it('should get _totalSupply', async function() {
-            expect(await rda.connect(user1).maxSupply()).to.be.equal(BigInt(10**7))
-              
+    
+    
+        describe("DiplomaFile Deployment", function() {
+           
+            it('price should be equal to variable price', async function() {
+                expect(await diplomaFile.price()).to.be.equal(price);
+            });
         });
-    });
-
-/* **************************************************************  Déploiement  ******************************************************************** */
-    describe("DiplomaFile Deploiement", function() {
-       
-        it('price should be equal to variable price', async function() {
-            expect(await diplomaFile.price()).to.be.equal(price);
+    
+        describe("DiplomaNFT Deployment", function() {
+           
+            it('name should be equal to RealDiplomaNFT', async function() {
+                expect(await diplomaNFT.name()).to.be.equal("RealDiplomaNFT");
+            });
+    
         });
-    });
-
-    describe("DiplomaNFT Deploiement", function() {
-       
-        it('name should be equal to RealDiplomaNFT', async function() {
-            expect(await diplomaNFT.name()).to.be.equal("RealDiplomaNFT");
-        });
+    
     });
     
    /* ******************************************************* Create Case  ******************************************************************** */
@@ -190,6 +197,11 @@ describe("TEST", function () {
                     .withArgs("Already a voter");
             }); 
 
+            it('should revert cause too small amount', async function() {
+                await expect(diplomaFile.connect(voter1).becomeVoter(ethers.parseEther('9')))
+                    .to.be.revertedWithCustomError( diplomaFile,"ErrorAmountMin")
+                    .withArgs("Amount min is 10");
+            }); 
 
             it('should add one Deposit to Deposits', async function() {
                 await diplomaFile.connect(voter1).becomeVoter(ethers.parseEther('100'));
@@ -339,12 +351,12 @@ describe("TEST", function () {
 
   
 
-   /* ******************************************************* Phase 2 : SimpleResolve & ContestCase  ******************************************************************** */
+   /* ******************************************************* Phase 2 : SimpleResolve & DisputeCase  ******************************************************************** */
        
-    describe("Phase 2 : SimpleResolve - ContestCase - getContest", function () {
+    describe("Phase 2 : SimpleResolve - DisputeCase - getDispute", function () {
 
         beforeEach(async function() {
-            await LoadFixtureForContestCase();
+            await LoadFixtureForDisputeCase();
             //await new Promise(resolve => setTimeout(resolve, 6000));
         });
 
@@ -417,11 +429,11 @@ describe("TEST", function () {
            
         });
     
-        describe("Function contestCase", function () {
+        describe("Function disputeCase", function () {
         
             it('should revert because the index does not exist in Cases - 1st require', async function() {
        
-                await expect(diplomaFile.connect(user2).contestCase(4,0))
+                await expect(diplomaFile.connect(user2).disputeCase(4,0))
                     .to.be.revertedWithCustomError( diplomaFile,"ErrorCaseUnknown")
                     .withArgs("This file doesn't exist");
             }); 
@@ -429,74 +441,74 @@ describe("TEST", function () {
 
             it('should revert because the delay has past', async function() {
                 await new Promise(resolve => setTimeout(resolve, 3000));
-                await expect(diplomaFile.connect(user2).contestCase(0,0))
+                await expect(diplomaFile.connect(user2).disputeCase(0,0))
                    .to.be.revertedWithCustomError(diplomaFile,"ErrorCaseNotPending")
                    .withArgs("The delay has past");
             }); 
 
 
             it('should revert because the case is already disputed', async function() {
-                await diplomaFile.connect(user2).contestCase(1,0);
-                await expect(diplomaFile.contestCase(1,0))
+                await diplomaFile.connect(user2).disputeCase(1,0);
+                await expect(diplomaFile.disputeCase(1,0))
                    .to.be.revertedWithCustomError(diplomaFile,"ErrorCaseNotPending")
                    .withArgs("This file is not pending")
             }); 
 
 
             it('should revert cause of Allowance', async function() {
-                 await expect(diplomaFile.connect(nonUser1).contestCase(0,0))
+                 await expect(diplomaFile.connect(nonUser1).disputeCase(0,0))
                     .to.be.revertedWithCustomError( rda,"ERC20InsufficientAllowance")
                     .withArgs(diplomaFile.target, 0, priceHT);
             }); 
 
 
             it('should revert cause of user2 has no token', async function() {
-                await expect(diplomaFile.connect(nonUser2).contestCase(0,0))
+                await expect(diplomaFile.connect(nonUser2).disputeCase(0,0))
                    .to.be.revertedWithCustomError( rda,"ERC20InsufficientBalance")
                    .withArgs(nonUser2, 0, priceHT);
             }); 
 
        
             it('should add one Deposit to Deposits', async function() {
-                await diplomaFile.connect(user2).contestCase(0,0);
+                await diplomaFile.connect(user2).disputeCase(0,0);
                 expect((await diplomaFile.getDeposits()).length).to.be.equal(4);
             });
     
 
             it('should add one Deposit with the good parameters', async function() {
-                await diplomaFile.connect(user2).contestCase(0,0);
-                let [sender, type, amount] = await diplomaFile.connect(user1).getContestDepositFromCaseIndex(0);
+                await diplomaFile.connect(user2).disputeCase(0,0);
+                let [sender, type, amount] = await diplomaFile.connect(user1).getDisputeDepositFromCaseIndex(0);
                 expect(sender).to.be.equal(user2);
                 expect(type).to.be.equal(1);
                 expect(amount).to.be.equal(priceHT);
             });
 
 
-            it('should set the mapping ContestToDiploma', async function() {
-                await diplomaFile.connect(user2).contestCase(0,0);
-                expect((await diplomaFile.getContestFromCaseIndex(0)).owner).to.be.equal(user2);
+            it('should set the mapping DisputeToDiploma', async function() {
+                await diplomaFile.connect(user2).disputeCase(0,0);
+                expect((await diplomaFile.getDisputeFromCaseIndex(0)).owner).to.be.equal(user2);
             });
 
-            it('should add one Contest to Contests', async function() {
-                await diplomaFile.contestCase(0,0);
-                    expect((await diplomaFile.getContests()).length).to.be.equal(1);
+            it('should add one Dispute to Disputes', async function() {
+                await diplomaFile.disputeCase(0,0);
+                    expect((await diplomaFile.getDisputes()).length).to.be.equal(1);
             });
 
-            it('should add one Contest with the good parameters', async function() {
-                await diplomaFile.connect(user2).contestCase(0,0);
-                let [sender, proof] = await diplomaFile.connect(user1).getContestFromCaseIndex(0);
+            it('should add one Dispute with the good parameters', async function() {
+                await diplomaFile.connect(user2).disputeCase(0,0);
+                let [sender, proof] = await diplomaFile.connect(user1).getDisputeFromCaseIndex(0);
                 expect(sender).to.be.equal(user2);
                 expect(proof).to.be.equal(0);
             });
 
             it('should set the status of the case to disputed', async function() {
-                await diplomaFile.connect(user2).contestCase(0,0);
+                await diplomaFile.connect(user2).disputeCase(0,0);
                 expect((await diplomaFile.getCase(0)).status).to.be.equal(2);
             });
 
             it('should send the fees to the daoAddress', async function() {
                 let balanceBefore = await rda.balanceOf(daoAddress);
-                await diplomaFile.connect(user2).contestCase(0,0);
+                await diplomaFile.connect(user2).disputeCase(0,0);
                 const balanceAfter = await rda.balanceOf(daoAddress);
                 balanceBefore += fees;
                 expect(balanceBefore).to.be.equal(balanceAfter);
@@ -504,13 +516,13 @@ describe("TEST", function () {
             
 
             it('should emit CreateNewDepositEvent', async function() {
-                await expect(diplomaFile.connect(user2).contestCase(0,0)).to.emit( diplomaFile,"CreateNewDepositEvent")
+                await expect(diplomaFile.connect(user2).disputeCase(0,0)).to.emit( diplomaFile,"CreateNewDepositEvent")
                 .withArgs(user2, 3, 1,  ethers.parseEther('100'));
             });
 
 
-            it('should emit CreateNewContestEvent', async function() {
-                await expect(diplomaFile.connect(user2).contestCase(0,0)).to.emit( diplomaFile,"CreateNewContestEvent")
+            it('should emit CreateNewDisputeEvent', async function() {
+                await expect(diplomaFile.connect(user2).disputeCase(0,0)).to.emit( diplomaFile,"CreateNewDisputeEvent")
                 .withArgs(user2, 0, 0);
             });
         
@@ -541,6 +553,16 @@ describe("TEST", function () {
                     .to.be.revertedWithCustomError( diplomaNFT,"ErrorCaseNotValidated")
                     .withArgs("Not Validated");
             }); 
+
+
+            it('should revert because the diploma is already minted', async function() {
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                await diplomaFile.simpleResolve(0);
+                await diplomaNFT.mintDiploma(0);
+                await expect(diplomaNFT.mintDiploma(0))
+                    .to.be.revertedWithCustomError( diplomaNFT,"ErrorAlreadyMinted")
+                    .withArgs("Already minted");
+            }); 
             
             it('should create a NFT with the good parameters', async function() {
                 await new Promise(resolve => setTimeout(resolve, 3000));
@@ -570,11 +592,11 @@ describe("TEST", function () {
 
         });
 
-        describe("Function getContest", function () {
+        describe("Function getDispute", function () {
         
-            it('should retrun the contest ', async function() {
-                await diplomaFile.connect(user2).contestCase(1,1);
-                const [owner, proof] = await diplomaFile.getContest(0);
+            it('should retrun the Dispute ', async function() {
+                await diplomaFile.connect(user2).disputeCase(1,1);
+                const [owner, proof] = await diplomaFile.getDispute(0);
                 expect(owner).to.be.equal(user2);
                 expect(proof).to.be.equal(1);
              }); 
@@ -582,11 +604,11 @@ describe("TEST", function () {
 
         });
 
-        describe("Function getContests", function () {
+        describe("Function getDisputes", function () {
         
-            it('should retrun the array of contests', async function() {
-                    await diplomaFile.connect(user2).contestCase(1,1);
-                    const v = await diplomaFile.getContests();
+            it('should retrun the array of Disputes', async function() {
+                    await diplomaFile.connect(user2).disputeCase(1,1);
+                    const v = await diplomaFile.getDisputes();
                     const [owner, proof] = v[0];
                     expect(owner).to.be.equal(user2);
                     expect(proof).to.be.equal(1);
@@ -676,10 +698,12 @@ describe("TEST", function () {
                 const [,,,tokenBefore] = await diplomaFile.getVote(0);
                 await diplomaFile.connect(voter1).setVote(0,1);
                 let [,,,tokenAfter] = await diplomaFile.getVote(0);
-                expect(tokenAfter).to.be.equal(BigInt(10000*10**18));
-                // await diplomaFile.connect(voter2).setVote(0,1);
-                // [,,,,tokenAfter] = await diplomaFile.getVote(0);
-                // expect(tokenAfter).to.be.equal(BigInt(5*10**22));
+                expect(tokenAfter).to.be.equal(BigInt(100*10**18));
+               
+
+                await diplomaFile.connect(voter2).setVote(0,1);
+                [,,,tokenAfter] = await diplomaFile.getVote(0);
+                expect(tokenAfter).to.be.equal(BigInt(500*10**18));
 
             }); 
 
@@ -747,7 +771,7 @@ describe("TEST", function () {
 
             it('should revert because the vote is not close yet', async function() {
                 await diplomaFile.createCase("Test", "Long", timestamp, "Alyra", "Rejected", timestamp);
-                await diplomaFile.connect(user2).contestCase(3,0);
+                await diplomaFile.connect(user2).disputeCase(3,0);
                 await expect(diplomaFile.resolveAfterVote(3))
                    .to.be.revertedWithCustomError(diplomaFile,"ErrorVoteInProgress")
                    .withArgs("The vote is not closed yet");
@@ -779,7 +803,7 @@ describe("TEST", function () {
                 balanceBefore +=   priceHT + bonus;
                 expect(balanceBefore).to.be.equal(balanceAfter);
                 expect((await diplomaFile.getDepositFromCaseIndex(1)).amount).to.be.equal(0);
-                expect((await diplomaFile.getContestDepositFromCaseIndex(1)).amount).to.be.equal(0);
+                expect((await diplomaFile.getDisputeDepositFromCaseIndex(1)).amount).to.be.equal(0);
             }); 
 
             
@@ -807,7 +831,7 @@ describe("TEST", function () {
                 balanceAfter -= (priceHT + bonus);
                 expect(balanceBefore).to.be.equal(balanceAfter);
                 expect((await diplomaFile.getDepositFromCaseIndex(2)).amount).to.be.equal(0);
-                expect((await diplomaFile.getContestDepositFromCaseIndex(2)).amount).to.be.equal(0);
+                expect((await diplomaFile.getDisputeDepositFromCaseIndex(2)).amount).to.be.equal(0);
                 
             }); 
 
@@ -878,7 +902,7 @@ describe("TEST", function () {
                     balanceBefore += BigInt(36*10**18);
                     expect(balanceBefore).to.be.equal(balanceAfter);
                     // expect((await diplomaFile.getDepositFromCaseIndex(2)).amount).to.be.equal(0);
-                    // expect((await diplomaFile.getContestDepositFromCaseIndex(2)).amount).to.be.equal(0);
+                    // expect((await diplomaFile.getDisputeDepositFromCaseIndex(2)).amount).to.be.equal(0);
                 }); 
     
                 it('should emit : GetRewardEvent(msg.sender, amount);', async function() {

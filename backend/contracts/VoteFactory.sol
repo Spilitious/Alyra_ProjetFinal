@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-    
+ import "@openzeppelin/contracts/access/Ownable.sol";   
  /// @title VoteFactory
  /// @notice A contract for managing voting operations on disputed cases.
  
@@ -65,9 +65,8 @@ contract VoteFactory {
     mapping (address => Voter) mapVoter;
     mapping(uint => mapping(address => Reward)) VoteToReward;
 
-    /// Constants
-    uint constant votingDelay = 5 seconds;
-
+    
+    
     
     constructor () {
        
@@ -120,57 +119,11 @@ contract VoteFactory {
     }
 
 
+   
 
 
     
-    /// @notice Sets the vote choice for the specified index.
-    /// @dev This function is external.
-    /// @param _index The index of the vote.
-    /// @param _choice The choice to be set (0 for no, 1 for yes).
-    function setVote(uint _index, uint _choice) external {
-        // Check if the specified vote index exists
-        if (Votes.length <= _index) {
-            revert ErrorVoteUnknown("This vote doesn't exist");
-        }
-
-        // Check if the sender is a registered voter
-        if (mapVoter[msg.sender].tokenAmount == 0) {
-            revert ErrorNotVoter("Not a voter");
-        }
-
-        // Check if the sender has already voted for this vote index
-        if (VoteToReward[_index][msg.sender].hasVoted) {
-            revert ErrorHasVoted("Already Voted");
-        }
-
-        // Check if the vote started before the sender became a voter
-        if (Votes[_index].creationTime < mapVoter[msg.sender].registrationTime) {
-            revert ErrorNotAllowedToVote("This vote started before you became a voter");
-        }
-
-        // Check if the vote is still open
-        if (block.timestamp > Votes[_index].creationTime + votingDelay) {
-            revert ErrorVoteClosed("This vote is closed");
-        }
-
-        // Increment the vote count based on the choice
-        if (_choice == 0) 
-            Votes[_index].no++;
-        
-        if (_choice == 1) 
-            Votes[_index].yes++;
     
-
-        // Update the total token square for the vote
-        Votes[_index].totalTokenSquare += (mapVoter[msg.sender].tokenAmount * (mapVoter[msg.sender].tokenAmount / 10**18));
-
-        // Mark the sender as having voted for this vote index
-        VoteToReward[_index][msg.sender].hasVoted = true;
-
-        // Emit an event to signify that a vote has been set
-         emit SetVoteEvent(msg.sender, _index, _choice);
-
-    }
    
 
 

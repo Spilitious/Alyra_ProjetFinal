@@ -13,7 +13,7 @@ contract DepositFactory {
     /// @notice Event emitted when a new deposit is created
     /// @param owner The address of the deposit owner
     /// @param idDeposit The identifier of the deposit
-    /// @param kind The type of deposit (fileDeposit, contestDeposit, voteDeposit)
+    /// @param kind The type of deposit (fileDeposit, DisputeDeposit, voteDeposit)
     /// @param amount The amount of the deposit
     event CreateNewDepositEvent(address owner, uint idDeposit, DepositType kind, uint amount);  
 
@@ -33,7 +33,7 @@ contract DepositFactory {
     /// @notice Enum representing the types of deposits
     enum DepositType {
         fileDeposit,    // Deposit for a file
-        contestDeposit, // Deposit for a contest
+        DisputeDeposit, // Deposit for a Dispute
         voteDeposit     // Deposit for a vote
     }
 

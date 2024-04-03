@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "./DiplomaFile.sol";
 
-contract DiplomaNFT is ERC721{
+contract DiplomaNft is ERC721{
     
    
 
@@ -56,7 +56,8 @@ contract DiplomaNFT is ERC721{
             revert ErrorNotYourCase("Not your case");
         if(status != 1)
             revert ErrorCaseNotValidated("Not Validated");
-        if(_ownerOf(_indexFile) != address(0))
+
+        if(_ownerOf(_indexFile+1) != address(0))
             revert ErrorAlreadyMinted("Already minted");
 
         string memory lastName = DiplomaFileContract.getDiplomaFromCaseIndex(_indexFile).lastName;
